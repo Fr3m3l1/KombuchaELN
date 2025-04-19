@@ -11,4 +11,4 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from src.main import ui
 
 if __name__ in {"__main__", "__mp_main__"}:
-    ui.run(title='Kombucha ELN', port=8080, storage_secret='kombucha_eln_secret_key')
+    ui.run(title='Kombucha ELN', port=8085, storage_secret='kombucha_eln_secret_key')
