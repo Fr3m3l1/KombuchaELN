@@ -8,6 +8,10 @@ from passlib.hash import pbkdf2_sha256
 # Create the base class for our ORM models
 Base = declarative_base()
 
+# create data folder if it doesn't exist
+if not os.path.exists('data'):
+    os.makedirs('data')
+
 # Define our models
 class User(Base):
     __tablename__ = 'users'
