@@ -64,6 +64,7 @@ class Batch(Base):
     id = sa.Column(sa.Integer, primary_key=True)
     experiment_id = sa.Column(sa.Integer, sa.ForeignKey('experiments.id'), nullable=False)
     name = sa.Column(sa.String, nullable=False)
+    status = sa.Column(sa.String, default="Setup", nullable=False)
     
     # Existing fields
     tea_type = sa.Column(sa.String, nullable=True)
@@ -96,23 +97,6 @@ class Measurement(Base):
     
     batch = relationship("Batch", back_populates="measurements")
     timepoint = relationship("Timepoint", back_populates="measurements")
-
-# Keep the Sample class for backward compatibility during migration
-class Sample(Base):
-    __tablename__ = 'samples'
-    
-    id = sa.Column(sa.Integer, primary_key=True)
-    experiment_id = sa.Column(sa.Integer, sa.ForeignKey('experiments.id'), nullable=False)
-    name = sa.Column(sa.String, nullable=False)
-    tea_type = sa.Column(sa.String, nullable=True)
-    tea_concentration = sa.Column(sa.Float, nullable=True)
-    water_amount = sa.Column(sa.Float, nullable=True)
-    sugar_type = sa.Column(sa.String, nullable=True)
-    sugar_concentration = sa.Column(sa.Float, nullable=True)
-    inoculum_concentration = sa.Column(sa.Float, nullable=True)
-    temperature = sa.Column(sa.Float, nullable=True)
-    
-    experiment = relationship("Experiment")
 
 # Database setup
 def get_engine(db_path='data/kombucha_eln.db'):

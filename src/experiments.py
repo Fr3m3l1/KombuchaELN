@@ -1,7 +1,7 @@
 from nicegui import ui
-from src.database import Experiment, Sample, Batch, get_session
+from src.database import Experiment, Batch, get_session
 from src.auth import get_current_user, login_required
-from src.templates import generate_experiment_html, generate_sample_dict_from_db_sample, generate_batch_dict_from_db_batch
+from src.templates import generate_experiment_html, generate_batch_dict_from_db_batch
 from src.elab_api import create_and_update_experiment
 import datetime
 
@@ -337,11 +337,12 @@ async def sync_experiment_with_elabftw(experiment_id):
         
         batches = session.query(Batch).filter_by(experiment_id=experiment_id).all()
         
-        # If no batches found, try to get samples (for backward compatibility)
+        # Handle case where no batches are found
         if not batches:
-            samples = session.query(Sample).filter_by(experiment_id=experiment_id).all()
-            sample_dicts = [generate_sample_dict_from_db_sample(sample) for sample in samples]
-            html_content = generate_experiment_html(experiment.title, sample_dicts)
+            ui.notify("No batches found for this experiment. Please add at least one batch.", color='warning')
+            # Create an empty list of batch dictionaries
+            batch_dicts = []
+            html_content = generate_experiment_html(experiment.title, batch_dicts)
         else:
             # Convert batches to dictionaries
             batch_dicts = [generate_batch_dict_from_db_batch(batch) for batch in batches]
@@ -508,10 +509,8 @@ def create_experiment_edit_ui(experiment_id):
             for batch in batches:
                 with ui.card().classes('w-full'):
                     # Batch header with name and status
-                    
                     with ui.row().classes('w-full justify-between items-center'):
                         ui.label(batch.name).classes('font-bold')
-                    
                     # Key parameters in a compact format
                     with ui.row().classes('text-sm text-gray-600 mt-1'):
                         if batch.tea_type:

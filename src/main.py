@@ -1,12 +1,42 @@
 from nicegui import ui, app
-from src.database import setup_database
+from src.database import setup_database, get_engine
 from src.auth import create_login_ui, create_register_ui, create_api_key_ui, login_required, get_current_user, logout
 from src.experiments import create_experiment_list_ui, create_new_experiment_ui, create_experiment_edit_ui, create_batch_detail_ui
 from src.timepoints import create_timepoint_workflow_ui, create_timepoint_config_ui
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 # Set up the database
 engine = setup_database()
+
+# Migrate batch status column if needed
+def migrate_batch_status():
+    """Add status column to batches table if it doesn't exist"""
+    try:
+        print("Checking if batch status migration is needed...")
+        inspector = inspect(engine)
+        
+        # Check if batches table exists
+        if 'batches' in inspector.get_table_names():
+            # Check if status column already exists in batches table
+            columns = [col['name'] for col in inspector.get_columns('batches')]
+            
+            if 'status' not in columns:
+                print("Adding status column to batches table...")
+                
+                # Create the new column
+                with engine.begin() as conn:
+                    conn.execute(sa.text(
+                        "ALTER TABLE batches ADD COLUMN status VARCHAR DEFAULT 'Setup' NOT NULL"
+                    ))
+                print("Batch status migration completed successfully!")
+            else:
+                print("Status column already exists. No migration needed.")
+    except Exception as e:
+        print(f"Error during batch status migration: {str(e)}")
+
+# Run migration
+migrate_batch_status()
 
 # Set up the app
 app.title = 'Kombucha ELN'
