@@ -38,9 +38,25 @@ class Experiment(Base):
     elab_id = sa.Column(sa.Integer, nullable=True)
     status = sa.Column(sa.String, default="Planning", nullable=False)
     notes = sa.Column(sa.String, nullable=True)
+    current_timepoint_id = sa.Column(sa.Integer, sa.ForeignKey('timepoints.id'), nullable=True)
     
     user = relationship("User", back_populates="experiments")
     batches = relationship("Batch", back_populates="experiment", cascade="all, delete-orphan")
+    timepoints = relationship("Timepoint", back_populates="experiment", cascade="all, delete-orphan", foreign_keys="Timepoint.experiment_id")
+    current_timepoint = relationship("Timepoint", foreign_keys=[current_timepoint_id])
+
+class Timepoint(Base):
+    __tablename__ = 'timepoints'
+    
+    id = sa.Column(sa.Integer, primary_key=True)
+    experiment_id = sa.Column(sa.Integer, sa.ForeignKey('experiments.id'), nullable=False)
+    name = sa.Column(sa.String, nullable=False)  # e.g., "t0", "t4", etc.
+    hours = sa.Column(sa.Float, nullable=False)  # e.g., 0, 4, 7, 11
+    description = sa.Column(sa.String, nullable=True)
+    order = sa.Column(sa.Integer, nullable=False)  # for sorting
+    
+    experiment = relationship("Experiment", back_populates="timepoints", foreign_keys=[experiment_id])
+    measurements = relationship("Measurement", back_populates="timepoint", cascade="all, delete-orphan")
 
 class Batch(Base):
     __tablename__ = 'batches'
@@ -58,25 +74,28 @@ class Batch(Base):
     inoculum_concentration = sa.Column(sa.Float, nullable=True)
     temperature = sa.Column(sa.Float, nullable=True)
     
-    # New fields for workflow tracking
-    status = sa.Column(sa.String, default="Setup", nullable=False)
-    preparation_time = sa.Column(sa.DateTime, nullable=True)
-    incubation_start_time = sa.Column(sa.DateTime, nullable=True)
-    incubation_end_time = sa.Column(sa.DateTime, nullable=True)
-    sample_split_time = sa.Column(sa.DateTime, nullable=True)
-    micro_plating_time = sa.Column(sa.DateTime, nullable=True)
-    micro_results = sa.Column(sa.String, nullable=True)
-    hplc_prep_time = sa.Column(sa.DateTime, nullable=True)
-    hplc_results = sa.Column(sa.String, nullable=True)
-    ph_measurement_time = sa.Column(sa.DateTime, nullable=True)
-    ph_value = sa.Column(sa.Float, nullable=True)
-    scoby_wet_weight_time = sa.Column(sa.DateTime, nullable=True)
-    scoby_wet_weight = sa.Column(sa.Float, nullable=True)
-    scoby_dry_weight = sa.Column(sa.Float, nullable=True)
-    temperature_logger_ids = sa.Column(sa.String, nullable=True)
-    notes = sa.Column(sa.String, nullable=True)
-    
     experiment = relationship("Experiment", back_populates="batches")
+    measurements = relationship("Measurement", back_populates="batch", cascade="all, delete-orphan")
+
+class Measurement(Base):
+    __tablename__ = 'measurements'
+    
+    id = sa.Column(sa.Integer, primary_key=True)
+    batch_id = sa.Column(sa.Integer, sa.ForeignKey('batches.id'), nullable=False)
+    timepoint_id = sa.Column(sa.Integer, sa.ForeignKey('timepoints.id'), nullable=False)
+    ph_value = sa.Column(sa.Float, nullable=True)
+    ph_sample_time = sa.Column(sa.DateTime, nullable=True)  # timestamp when pH sample was collected
+    micro_results = sa.Column(sa.String, nullable=True)
+    micro_sample_time = sa.Column(sa.DateTime, nullable=True)  # timestamp when microbiology sample was collected
+    hplc_results = sa.Column(sa.String, nullable=True)
+    hplc_sample_time = sa.Column(sa.DateTime, nullable=True)  # timestamp when HPLC sample was collected
+    scoby_wet_weight = sa.Column(sa.Float, nullable=True)  # only relevant for final timepoint
+    scoby_dry_weight = sa.Column(sa.Float, nullable=True)  # only relevant for final timepoint
+    notes = sa.Column(sa.String, nullable=True)
+    completed = sa.Column(sa.Boolean, default=False, nullable=False)
+    
+    batch = relationship("Batch", back_populates="measurements")
+    timepoint = relationship("Timepoint", back_populates="measurements")
 
 # Keep the Sample class for backward compatibility during migration
 class Sample(Base):

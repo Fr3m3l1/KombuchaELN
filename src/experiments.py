@@ -508,24 +508,9 @@ def create_experiment_edit_ui(experiment_id):
             for batch in batches:
                 with ui.card().classes('w-full'):
                     # Batch header with name and status
-                    batch_status = getattr(batch, 'status', 'Setup')
-                    batch_status_colors = {
-                        'Setup': 'gray',
-                        'Prepared': 'blue',
-                        'Incubating': 'orange',
-                        'Sampling': 'purple',
-                        'Analysis Pending': 'indigo',
-                        'Micro Plated': 'pink',
-                        'HPLC Prepped': 'yellow',
-                        'pH Measured': 'green',
-                        'SCOBY Weighed': 'teal',
-                        'Completed': 'green'
-                    }
-                    batch_status_color = batch_status_colors.get(batch_status, 'gray')
                     
                     with ui.row().classes('w-full justify-between items-center'):
                         ui.label(batch.name).classes('font-bold')
-                        ui.label(batch_status).classes(f'text-{batch_status_color}-500 font-bold')
                     
                     # Key parameters in a compact format
                     with ui.row().classes('text-sm text-gray-600 mt-1'):
@@ -544,11 +529,10 @@ def create_experiment_edit_ui(experiment_id):
                         ).classes('mr-2')
                         
                         # Only show Quick Edit if in Setup status
-                        if batch_status == 'Setup':
-                            ui.button(
-                                'Quick Edit',
-                                on_click=lambda b=batch.id: open_batch_edit_dialog(b)
-                            )
+                        ui.button(
+                            'Quick Edit',
+                            on_click=lambda b=batch.id: open_batch_edit_dialog(b)
+                        )
         
         # Add new batch button
         async def handle_add_batch():
@@ -580,18 +564,16 @@ def create_experiment_edit_ui(experiment_id):
             ui.button('Save Experiment', on_click=save_experiment).classes('mr-2')
             ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id)).classes('mr-2')
             
-            # Start experiment button (changes status from Planning to Running)
-            async def start_experiment():
-                success = await update_experiment(experiment_id, status='Running')
-                if success:
-                    ui.notify('Experiment started', color='positive')
-                    # Refresh the page to show updated status
-                    ui.run_javascript("window.location.reload()")
-                else:
-                    ui.notify('Failed to start experiment', color='negative')
+            # Workflow buttons
+            ui.button(
+                'Workflow Tracking',
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'")
+            ).classes('mr-2 bg-blue-500 text-white')
             
-            if status == 'Planning':
-                ui.button('Start Experiment', on_click=start_experiment).classes('mr-2')
+            ui.button(
+                'Configure Timepoints',
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'")
+            ).classes('mr-2')
             
             ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
 
@@ -668,24 +650,7 @@ def create_batch_detail_ui(batch_id):
                 ui.button(
                     'Back to Experiment',
                     on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{batch.experiment_id}'")
-                ).classes('text-blue-500 p-0 bg-transparent')
-            
-            # Status badge
-            status = getattr(batch, 'status', 'Setup')
-            status_colors = {
-                'Setup': 'gray',
-                'Prepared': 'blue',
-                'Incubating': 'orange',
-                'Sampling': 'purple',
-                'Analysis Pending': 'indigo',
-                'Micro Plated': 'pink',
-                'HPLC Prepped': 'yellow',
-                'pH Measured': 'green',
-                'SCOBY Weighed': 'teal',
-                'Completed': 'green'
-            }
-            status_color = status_colors.get(status, 'gray')
-            ui.label(status).classes(f'text-{status_color}-500 font-bold text-xl')
+                ).classes('mt-4')
     
     # Key parameters display
     with ui.card().classes('w-full mt-4'):
@@ -700,297 +665,4 @@ def create_batch_detail_ui(batch_id):
             ui.label(f'Inoculum Concentration: {batch.inoculum_concentration or "N/A"} %')
             ui.label(f'Temperature: {batch.temperature or "N/A"} °C')
         
-        # Only show edit button if in Setup status
-        if status == 'Setup':
-            ui.button('Edit Parameters', on_click=lambda: open_batch_edit_dialog(batch_id)).classes('mt-2')
-    
-    # Workflow progress tracker
-    with ui.card().classes('w-full mt-4'):
-        ui.label('Workflow Progress').classes('text-xl font-bold')
-        
-        stages = ['Setup', 'Preparation', 'Incubation', 'Sampling', 'Analysis', 'Completed']
-        current_stage_index = 0
-        
-        # Determine current stage based on status
-        status_to_stage = {
-            'Setup': 0,
-            'Prepared': 1,
-            'Incubating': 2,
-            'Sampling': 3,
-            'Analysis Pending': 4,
-            'Micro Plated': 4,
-            'HPLC Prepped': 4,
-            'pH Measured': 4,
-            'SCOBY Weighed': 4,
-            'Completed': 5
-        }
-        current_stage_index = status_to_stage.get(status, 0)
-        
-        # Create visual timeline
-        with ui.row().classes('w-full items-center mt-2'):
-            for i, stage in enumerate(stages):
-                # Stage circle
-                circle_color = 'bg-green-500' if i < current_stage_index else ('bg-blue-500' if i == current_stage_index else 'bg-gray-300')
-                with ui.element('div').classes(f'rounded-full {circle_color} w-8 h-8 flex items-center justify-center text-white'):
-                    ui.label(str(i+1))
-                
-                # Stage name
-                name_color = 'text-green-500' if i < current_stage_index else ('text-blue-500' if i == current_stage_index else 'text-gray-500')
-                ui.label(stage).classes(f'{name_color} text-sm')
-                
-                # Connector line (except after the last stage)
-                if i < len(stages) - 1:
-                    line_color = 'bg-green-500' if i < current_stage_index else 'bg-gray-300'
-                    ui.element('div').classes(f'{line_color} h-1 flex-grow')
-    
-    # Create the action sections
-    create_batch_action_sections(batch, batch_id, current_stage_index)
-
-def create_batch_action_sections(batch, batch_id, current_stage_index):
-    """
-    Create the action sections for a batch
-    
-    Args:
-        batch: The batch object
-        batch_id: The ID of the batch
-        current_stage_index: The current stage index
-    """
-    status = getattr(batch, 'status', 'Setup')
-    
-    with ui.card().classes('w-full mt-4'):
-        ui.label('Actions & Logging').classes('text-xl font-bold')
-        
-        # Preparation section
-        with ui.expansion('Preparation (Steps 1-7)', value=(current_stage_index == 0)).classes('w-full'):
-            ui.label('Mark when the batch has been prepared and inoculated').classes('text-sm text-gray-600')
-            
-            # Show timestamp if already prepared
-            if hasattr(batch, 'preparation_time') and batch.preparation_time:
-                ui.label(f'Prepared on: {batch.preparation_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-            else:
-                async def mark_prepared():
-                    success = await log_batch_action(batch_id, 'preparation')
-                    if success:
-                        ui.notify('Batch marked as prepared', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                
-                ui.button('Mark as Prepared & Inoculated', on_click=mark_prepared)
-        
-        # Incubation section
-        with ui.expansion('Incubation (Steps 8-10)', value=(current_stage_index == 1)).classes('w-full'):
-            ui.label('Record incubation start and end times').classes('text-sm text-gray-600')
-            
-            # Incubation start
-            if hasattr(batch, 'incubation_start_time') and batch.incubation_start_time:
-                ui.label(f'Incubation started: {batch.incubation_start_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-                
-                # Calculate target end time (11 hours later)
-                target_end = batch.incubation_start_time + datetime.timedelta(hours=11)
-                ui.label(f'Target end time: {target_end.strftime("%Y-%m-%d %H:%M")}').classes('text-blue-500')
-            else:
-                async def start_incubation():
-                    success = await log_batch_action(batch_id, 'incubation_start')
-                    if success:
-                        ui.notify('Incubation start recorded', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                
-                ui.button('Start Incubation', on_click=start_incubation)
-            
-            # Incubation end (only show if incubation has started)
-            if hasattr(batch, 'incubation_start_time') and batch.incubation_start_time:
-                if hasattr(batch, 'incubation_end_time') and batch.incubation_end_time:
-                    ui.label(f'Incubation ended: {batch.incubation_end_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-                else:
-                    async def end_incubation():
-                        success = await log_batch_action(batch_id, 'incubation_end')
-                        if success:
-                            ui.notify('Incubation end recorded', color='positive')
-                            # Refresh the page
-                            ui.run_javascript("window.location.reload()")
-                    
-                    ui.button('End Incubation', on_click=end_incubation)
-            
-            # Temperature logger IDs
-            ui.label('Temperature Logger IDs').classes('mt-4')
-            logger_ids = ui.input(
-                label='Logger IDs (Front, Middle, Back)',
-                value=getattr(batch, 'temperature_logger_ids', ''),
-                placeholder='e.g., T1234, T5678, T9012'
-            ).classes('w-full')
-            
-            async def save_logger_ids():
-                success = await update_batch(batch_id, temperature_logger_ids=logger_ids.value)
-                if success:
-                    ui.notify('Logger IDs saved', color='positive')
-                else:
-                    ui.notify('Failed to save logger IDs', color='negative')
-            
-            ui.button('Save Logger IDs', on_click=save_logger_ids).classes('mt-2')
-        
-        # Sampling & Splitting section
-        with ui.expansion('Sampling & Splitting (Steps 11-13)', value=(current_stage_index == 2)).classes('w-full'):
-            ui.label('Record when samples were split').classes('text-sm text-gray-600')
-            
-            if hasattr(batch, 'sample_split_time') and batch.sample_split_time:
-                ui.label(f'Samples split on: {batch.sample_split_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-            else:
-                async def log_sample_split():
-                    success = await log_batch_action(batch_id, 'sample_split')
-                    if success:
-                        ui.notify('Sample splitting recorded', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                
-                ui.button('Log Sample Splitting', on_click=log_sample_split)
-        
-        # Analysis - Microbiology section
-        with ui.expansion('Analysis - Microbiology (Steps 14-15)', value=(current_stage_index == 3 or current_stage_index == 4)).classes('w-full'):
-            ui.label('Record microbiology dilution, plating, and results').classes('text-sm text-gray-600')
-            
-            if hasattr(batch, 'micro_plating_time') and batch.micro_plating_time:
-                ui.label(f'Micro plating done on: {batch.micro_plating_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-            else:
-                async def log_micro_plating():
-                    success = await log_batch_action(batch_id, 'micro_plating')
-                    if success:
-                        ui.notify('Micro plating recorded', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                
-                ui.button('Log Micro Dilution & Plating', on_click=log_micro_plating)
-            
-            # Micro results
-            ui.label('Microbiology Results').classes('mt-4')
-            micro_results = ui.textarea(
-                label='CFU Counts and Notes',
-                value=getattr(batch, 'micro_results', ''),
-                placeholder='Enter CFU counts and any observations here...'
-            ).classes('w-full')
-            
-            async def save_micro_results():
-                success = await update_batch(batch_id, micro_results=micro_results.value)
-                if success:
-                    ui.notify('Micro results saved', color='positive')
-                else:
-                    ui.notify('Failed to save micro results', color='negative')
-            
-            ui.button('Save Micro Results', on_click=save_micro_results).classes('mt-2')
-        
-        # Analysis - HPLC section
-        with ui.expansion('Analysis - HPLC (Steps 16-17)', value=(current_stage_index == 4)).classes('w-full'):
-            ui.label('Record HPLC sample preparation and results').classes('text-sm text-gray-600')
-            
-            if hasattr(batch, 'hplc_prep_time') and batch.hplc_prep_time:
-                ui.label(f'HPLC prep done on: {batch.hplc_prep_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-            else:
-                async def log_hplc_prep():
-                    success = await log_batch_action(batch_id, 'hplc_prep')
-                    if success:
-                        ui.notify('HPLC prep recorded', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                
-                ui.button('Log HPLC Sample Prep', on_click=log_hplc_prep)
-            
-            # HPLC results
-            ui.label('HPLC Results').classes('mt-4')
-            hplc_results = ui.textarea(
-                label='HPLC Data and Notes',
-                value=getattr(batch, 'hplc_results', ''),
-                placeholder='Enter HPLC results and any observations here...'
-            ).classes('w-full')
-            
-            async def save_hplc_results():
-                success = await update_batch(batch_id, hplc_results=hplc_results.value)
-                if success:
-                    ui.notify('HPLC results saved', color='positive')
-                else:
-                    ui.notify('Failed to save HPLC results', color='negative')
-            
-            ui.button('Save HPLC Results', on_click=save_hplc_results).classes('mt-2')
-        
-        # Analysis - pH section
-        with ui.expansion('Analysis - pH (Steps 18-19)', value=(current_stage_index == 4)).classes('w-full'):
-            ui.label('Record pH measurement').classes('text-sm text-gray-600')
-            
-            if hasattr(batch, 'ph_measurement_time') and batch.ph_measurement_time:
-                ui.label(f'pH measured on: {batch.ph_measurement_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-                ui.label(f'pH value: {batch.ph_value or "N/A"}').classes('text-green-500')
-            else:
-                ph_value = ui.number('pH Value', min=0, max=14, step=0.01).classes('w-full')
-                
-                async def log_ph_measurement():
-                    success = await log_batch_action(batch_id, 'ph_measurement', ph_value=ph_value.value)
-                    if success:
-                        ui.notify('pH measurement recorded', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                    else:
-                        ui.notify('Failed to record pH measurement', color='negative')
-                
-                ui.button('Log pH Measurement', on_click=log_ph_measurement).classes('mt-2')
-        
-        # Analysis - SCOBY section
-        with ui.expansion('Analysis - SCOBY (Steps 20-22)', value=(current_stage_index == 4)).classes('w-full'):
-            ui.label('Record SCOBY weight measurements').classes('text-sm text-gray-600')
-            
-            # Wet weight
-            if hasattr(batch, 'scoby_wet_weight_time') and batch.scoby_wet_weight_time:
-                ui.label(f'SCOBY wet weight measured on: {batch.scoby_wet_weight_time.strftime("%Y-%m-%d %H:%M")}').classes('text-green-500')
-                ui.label(f'Wet weight: {batch.scoby_wet_weight or "N/A"} g').classes('text-green-500')
-            else:
-                wet_weight = ui.number('Wet Weight (g)', min=0, step=0.1).classes('w-full')
-                
-                async def log_wet_weight():
-                    success = await log_batch_action(batch_id, 'scoby_wet_weight', scoby_wet_weight=wet_weight.value)
-                    if success:
-                        ui.notify('Wet weight recorded', color='positive')
-                        # Refresh the page
-                        ui.run_javascript("window.location.reload()")
-                    else:
-                        ui.notify('Failed to record wet weight', color='negative')
-                
-                ui.button('Log Wet Weight', on_click=log_wet_weight).classes('mt-2')
-            
-            # Dry weight (only show if wet weight is recorded)
-            if hasattr(batch, 'scoby_wet_weight_time') and batch.scoby_wet_weight_time:
-                ui.separator().classes('my-4')
-                
-                if hasattr(batch, 'scoby_dry_weight') and batch.scoby_dry_weight:
-                    ui.label(f'Dry weight: {batch.scoby_dry_weight} g').classes('text-green-500')
-                else:
-                    dry_weight = ui.number('Dry Weight (g)', min=0, step=0.1).classes('w-full')
-                    
-                    async def log_dry_weight():
-                        success = await update_batch(batch_id, scoby_dry_weight=dry_weight.value)
-                        if success:
-                            # Also mark as completed
-                            await log_batch_action(batch_id, 'scoby_dry_weight')
-                            ui.notify('Dry weight recorded', color='positive')
-                            # Refresh the page
-                            ui.run_javascript("window.location.reload()")
-                        else:
-                            ui.notify('Failed to record dry weight', color='negative')
-                    
-                    ui.button('Log Dry Weight', on_click=log_dry_weight).classes('mt-2')
-        
-        # Batch notes
-        with ui.expansion('Batch Notes', value=False).classes('w-full'):
-            ui.label('General observations and notes for this batch').classes('text-sm text-gray-600')
-            
-            notes = ui.textarea(
-                label='Notes',
-                value=getattr(batch, 'notes', ''),
-                placeholder='Enter any general observations or notes about this batch...'
-            ).classes('w-full')
-            
-            async def save_notes():
-                success = await update_batch(batch_id, notes=notes.value)
-                if success:
-                    ui.notify('Notes saved', color='positive')
-                else:
-                    ui.notify('Failed to save notes', color='negative')
-            
-            ui.button('Save Notes', on_click=save_notes).classes('mt-2')
+        ui.button('Edit Parameters', on_click=lambda: open_batch_edit_dialog(batch_id)).classes('mt-2')
