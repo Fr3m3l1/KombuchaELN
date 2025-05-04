@@ -559,23 +559,25 @@ def create_experiment_edit_ui(experiment_id):
                     ui.notify('Experiment saved', color='positive')
                 else:
                     ui.notify('Failed to save experiment', color='negative')
-            
-            ui.button('Save Experiment', on_click=save_experiment).classes('mr-2')
-            ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id)).classes('mr-2')
-            
+
+            ui.button('Save Experiment', on_click=save_experiment, color='green').classes('mr-2')
+            ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id), color='indigo').classes('mr-2')
+
             # Workflow buttons
             ui.button(
                 'Workflow Tracking',
-                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'")
-            ).classes('mr-2 bg-blue-500 text-white')
-            
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'"),
+                color='blue'
+            ).classes('mr-2')
+
             ui.button(
                 'Configure Timepoints',
-                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'")
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'"),
+                color='yellow'
             ).classes('mr-2')
-            
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
 
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+       
 def open_batch_edit_dialog(batch_id):
     """
     Open a dialog to edit batch parameters

@@ -467,7 +467,7 @@ def create_timepoint_config_ui(experiment_id):
             else:
                 ui.notify('Failed to add timepoint', color='negative')
         
-        ui.button('Add Timepoint', on_click=add_timepoint).classes('mt-2')
+        ui.button('Add Timepoint', on_click=add_timepoint, color='green').classes('mt-2')
 
 async def delete_timepoint(timepoint_id):
     """
@@ -709,9 +709,10 @@ def create_timepoint_workflow_ui(experiment_id):
                                         ui.label('PH Sample Collected').classes('text-green-500 text-center w-full')
                                     else:
                                         ui.button(
-                                            'Collect PH Sample', 
-                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='ph')
-                                        ).classes('bg-blue-500 text-white w-full')
+                                            'Collect PH Sample',
+                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='ph'), 
+                                            color='red'
+                                        ).classes('text-white w-full')
 
                                     # MICRO Sample button
                                     if micro_collected:
@@ -719,8 +720,9 @@ def create_timepoint_workflow_ui(experiment_id):
                                     else:
                                         ui.button(
                                             'Collect MICRO Sample', 
-                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='micro')
-                                        ).classes('bg-blue-500 text-white w-full')
+                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='micro'),
+                                            color='green'
+                                        ).classes('text-white w-full')
 
                                     # HPLC Sample button
                                     if hplc_collected:
@@ -728,8 +730,9 @@ def create_timepoint_workflow_ui(experiment_id):
                                     else:
                                         ui.button(
                                             'Collect HPLC Sample', 
-                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='hplc')
-                                        ).classes('bg-blue-500 text-white w-full')
+                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='hplc'),
+                                            color='black'
+                                        ).classes('text-white w-full')
                             
                             ui.separator().classes('my-2')
                             
@@ -936,7 +939,9 @@ def create_timepoint_workflow_ui(experiment_id):
                             finally:
                                 session.close()
                         
-                        ui.button('Complete Experiment', on_click=complete_experiment).classes('bg-green-500 text-white')
+                        ui.button('Complete Experiment',
+                                  on_click=complete_experiment, color='red'
+                                ).classes('text-white')
                     else:
                         async def advance_timepoint():
                             next_timepoint_id = await advance_to_next_timepoint(experiment_id)
@@ -946,7 +951,10 @@ def create_timepoint_workflow_ui(experiment_id):
                             else:
                                 ui.notify('Failed to advance timepoint', color='negative')
                         
-                        ui.button('Advance to Next Timepoint', on_click=advance_timepoint).classes('bg-blue-500 text-white')
+                        ui.button('Advance to Next Timepoint',
+                                  on_click=advance_timepoint,
+                                  color='blue'
+                                ).classes('bg-blue-500 text-white')
         else:
             ui.label('No active timepoint').classes('text-lg font-bold mt-4')
             
