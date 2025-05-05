@@ -501,7 +501,7 @@ def create_experiment_list_ui():
                         # Action buttons
                         with ui.row().classes('w-full justify-end mt-2'):
                             ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
-                            ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e)).classes('mr-2')
+                            ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
         
         ui.button('Create New Experiment', on_click=lambda: ui.run_javascript("window.location.href = '/new-experiment'")).classes('mt-4')
 
@@ -525,7 +525,7 @@ def create_new_experiment_ui():
             else:
                 ui.notify('Failed to create experiment', color='negative')
         
-        ui.button('Create', on_click=handle_create).classes('mt-4')
+        ui.button('Create', on_click=handle_create, color='green').classes('mt-4')
         ui.button('Cancel', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mt-4 ml-2')
 
 def create_experiment_edit_ui(experiment_id):
@@ -667,13 +667,13 @@ def create_experiment_edit_ui(experiment_id):
             ui.button(
                 'Workflow Tracking',
                 on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'"),
-                color='blue'
+                color='purple'
             ).classes('mr-2')
 
             ui.button(
                 'Configure Timepoints',
                 on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'"),
-                color='yellow'
+                color='pink'
             ).classes('mr-2')
 
             ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
@@ -723,7 +723,7 @@ def open_batch_edit_dialog(batch_id):
         
         with ui.row().classes('w-full justify-end'):
             ui.button('Cancel', on_click=dialog.close).classes('mr-2')
-            ui.button('Save', on_click=save_batch)
+            ui.button('Save', on_click=save_batch, color='green')
         
         dialog.open()
 

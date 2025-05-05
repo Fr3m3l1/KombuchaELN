@@ -50,7 +50,7 @@ def index():
             ui.label('Kombucha ELN').classes('text-3xl')
 
             with ui.row():
-                ui.button('API Key', on_click=lambda: ui.run_javascript("window.location.href = '/api-key'"), color='indigo').classes('mr-2')
+                ui.button('API Key', on_click=lambda: ui.run_javascript("window.location.href = '/api-key'"), color='blue').classes('mr-2')
 
                 def handle_logout():
                     # Clear user from session
