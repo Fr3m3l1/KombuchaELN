@@ -649,7 +649,7 @@ def create_timepoint_workflow_ui(experiment_id):
                 ui.label('Quick Actions:').classes('font-bold')
                 
                 # Create a card for each batch with quick action buttons
-                with ui.grid(columns=len(batches)).classes('w-full gap-4 mt-2'):
+                with ui.grid(columns=5).classes('w-full gap-4 mt-2'):
                     for batch in batches:
                         with ui.card().classes('p-4'):
                             ui.label(batch.name).classes('font-bold text-center')
