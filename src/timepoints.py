@@ -745,12 +745,23 @@ def create_timepoint_workflow_ui(experiment_id):
                                     # Open a simple dialog to enter pH value
                                     with ui.dialog() as ph_dialog, ui.card():
                                         ui.label(f'Record pH for {batch.name}').classes('text-lg font-bold')
-                                        ph_value = ui.number('pH Value', min=0, max=14, step=0.01).classes('w-full')
+                                        ph_value = ui.number('pH Value', 
+                                                            min=0, 
+                                                            max=14, 
+                                                            step=0.01
+                                                        ).classes('w-full')
+
+                                        # Helper text to reinforce the valid range
+                                        ui.label('Enter a pH value between 0.0 and 14.0').classes('text-sm text-gray-500')
+                                        
+
                                         
                                         async def save_ph():
                                             if ph_value.value is None:
                                                 ui.notify('Please enter a pH value', color='negative')
                                                 return
+                                            if not (0 <= ph_value.value <= 14.5):
+                                                ui.notify('pH must be between 0 and 14', color='negative')
                                                 
                                             success = await record_measurement(
                                                 b_id, 
