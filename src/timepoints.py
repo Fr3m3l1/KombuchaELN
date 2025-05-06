@@ -742,32 +742,29 @@ def create_timepoint_workflow_ui(experiment_id):
                             with ui.grid(columns=3).classes('w-full gap-2 mt-2'):
                                 # pH Button
                                 async def record_ph(b_id=batch.id, t_id=current_timepoint.id):
-                                    # Open a simple dialog to enter pH value
-                                    with ui.dialog() as ph_dialog, ui.card():
+
+                                    # Declare the dialog in outer scope to close it later
+                                    ph_dialog = ui.dialog()
+
+                                    with ph_dialog, ui.card():
                                         ui.label(f'Record pH for {batch.name}').classes('text-lg font-bold')
-                                        ph_value = ui.number('pH Value', 
-                                                            min=0, 
-                                                            max=14, 
-                                                            step=0.01
-                                                        ).classes('w-full')
-
-                                        # Helper text to reinforce the valid range
-                                        ui.label('Enter a pH value between 0.0 and 14.0').classes('text-sm text-gray-500')
                                         
+                                        # Free-text input for precise validation
+                                        ph_input = ui.input('pH Value (0-14)').classes('w-full')
+                                        error_label = ui.label('').classes('text-red-500 text-sm')
 
-                                        
                                         async def save_ph():
-                                            if ph_value.value is None:
-                                                ui.notify('Please enter a pH value', color='negative')
+                                            error_label.text = '' # Clear previous error
+                                            try:
+                                                value = float(ph_input.value)
+                                                if not (0 <= value <= 14):
+                                                    raise ValueError
+                                            except (ValueError, TypeError):
+                                                error_label.text = 'Invalid pH: please enter a value between 0 and 14.'
                                                 return
-                                            if not (0 <= ph_value.value <= 14.5):
-                                                ui.notify('pH must be between 0 and 14', color='negative')
-                                                
-                                            success = await record_measurement(
-                                                b_id, 
-                                                t_id, 
-                                                ph_value=ph_value.value
-                                            )
+                                            
+                                            success = await record_measurement(b_id, t_id, ph_value=value)
+                                            
                                             if success:
                                                 ui.notify('pH value saved', color='positive')
                                                 ph_dialog.close()
@@ -779,7 +776,7 @@ def create_timepoint_workflow_ui(experiment_id):
                                             ui.button('Cancel', on_click=ph_dialog.close).classes('mr-2')
                                             ui.button('Save', on_click=save_ph, color='green').classes('bg-green-500 text-white')
                                         
-                                        ph_dialog.open()
+                                    ph_dialog.open()
                                 
                                 ph_btn_color = 'bg-green-500' if measurement and measurement.ph_value else 'bg-blue-500'
                                 ph_btn_text = 'pH: Recorded' if measurement and measurement.ph_value else 'Record pH'
