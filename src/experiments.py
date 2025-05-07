@@ -2,7 +2,7 @@ from nicegui import ui
 from src.database import Experiment, Batch, get_session
 from src.auth import get_current_user, login_required
 from src.templates import generate_experiment_html, generate_batch_dict_from_db_batch
-from src.elab_api import create_and_update_experiment
+from src.elab_api import create_and_update_experiment, initialize_api_client
 import datetime
 
 # New function to duplicate a batch
@@ -381,7 +381,9 @@ async def add_batch_to_experiment(experiment_id, batch_name):
 
 async def sync_experiment_with_elabftw(experiment_id):
     """
-    Sync an experiment with elabFTW
+    Sync an experiment with eLabFTW.
+    If elab_id exists, update the experiment.
+    Otherwise, create a new one.
     
     Args:
         experiment_id: The ID of the experiment
@@ -389,56 +391,96 @@ async def sync_experiment_with_elabftw(experiment_id):
     Returns:
         True if sync was successful, False otherwise
     """
+    from src.timepoints import get_experiment_timepoints, get_batch_measurement
+
     current_user = get_current_user()
     if current_user is None or not current_user.elab_api_key:
         ui.notify("API key not set. Please set your API key first.", color='negative')
         return False
-    
+
     session = get_session()
     try:
-        # Get experiment and batches
         experiment = session.query(Experiment).filter_by(id=experiment_id).first()
         if not experiment:
             ui.notify("Experiment not found", color='negative')
             return False
-        
+
         batches = session.query(Batch).filter_by(experiment_id=experiment_id).all()
-        
-        # Handle case where no batches are found
-        if not batches:
-            ui.notify("No batches found for this experiment. Please add at least one batch.", color='warning')
-            # Create an empty list of batch dictionaries
-            batch_dicts = []
-            html_content = generate_experiment_html(experiment.title, batch_dicts)
-        else:
-            # Convert batches to dictionaries
-            batch_dicts = [generate_batch_dict_from_db_batch(batch) for batch in batches]
-            html_content = generate_experiment_html(experiment.title, batch_dicts)
-        
-        # Create experiment in elabFTW
-        elab_experiment = create_and_update_experiment(
-            api_key=current_user.elab_api_key,
-            title=experiment.title,
-            body=html_content,
-            tags=["KombuchaELN", "API"]
-        )
-        
-        if elab_experiment:
-            # Update experiment with elabFTW ID
-            experiment.elab_id = elab_experiment.id
-            session.commit()
-            
-            ui.notify(f"Experiment synced with elabFTW (ID: {elab_experiment.id})", color='positive')
-            return True
-        else:
-            ui.notify("Failed to sync with elabFTW", color='negative')
+        timepoints = get_experiment_timepoints(experiment_id)
+        final_tp_id = timepoints[-1].id if timepoints else None
+
+        # Combine batch metadata with measurement data
+        batch_dicts = []
+        for batch in batches:
+            batch_dict = generate_batch_dict_from_db_batch(batch)
+
+            # Pull in measurements across timepoints
+            for tp in timepoints:
+                m = get_batch_measurement(batch.id, tp.id)
+                if m:
+                    if m.ph_value is not None:
+                        batch_dict['ph_value'] = m.ph_value
+                    if m.micro_results:
+                        batch_dict['micro_results'] = m.micro_results
+                    if m.hplc_results:
+                        batch_dict['hplc_results'] = m.hplc_results
+                    if tp.id == final_tp_id:
+                        if m.scoby_wet_weight is not None:
+                            batch_dict['scoby_wet_weight'] = m.scoby_wet_weight
+                        if m.scoby_dry_weight is not None:
+                            batch_dict['scoby_dry_weight'] = m.scoby_dry_weight
+                    if m.notes:
+                        batch_dict['notes'] = m.notes
+
+            batch_dicts.append(batch_dict)
+
+        # Generate full HTML report
+        html_content = generate_experiment_html(experiment.title, batch_dicts)
+
+        # Initialize API client
+        clients = initialize_api_client(current_user.elab_api_key)
+        if not clients:
+            ui.notify("Failed to initialize API client", color='negative')
             return False
+
+        _, exp_client, _, _ = clients
+
+        if experiment.elab_id:
+            # Update existing experiment
+            update_payload = {
+                'title': experiment.title,
+                'body': html_content,
+            }
+            exp_client.patch_experiment_with_http_info(
+                id=experiment.elab_id,
+                body=update_payload,
+                async_req=False
+            )
+            ui.notify(f"Experiment updated in eLabFTW (ID: {experiment.elab_id})", color='positive')
+        else:
+            # Create a new experiment
+            elab_experiment = create_and_update_experiment(
+                api_key=current_user.elab_api_key,
+                title=experiment.title,
+                body=html_content,
+                tags=["KombuchaELN", "API"]
+            )
+            if elab_experiment:
+                experiment.elab_id = elab_experiment.id
+                session.commit()
+                ui.notify(f"Experiment synced with eLabFTW (ID: {elab_experiment.id})", color='positive')
+            else:
+                ui.notify("Failed to sync with eLabFTW", color='negative')
+                return False
+
+        return True
     except Exception as e:
         session.rollback()
-        ui.notify(f"Error syncing with elabFTW: {str(e)}", color='negative')
+        ui.notify(f"Error syncing with eLabFTW: {str(e)}", color='negative')
         return False
     finally:
         session.close()
+
 
 def create_experiment_list_ui():
     """Create the UI for listing experiments"""
@@ -593,8 +635,8 @@ def create_experiment_edit_ui(experiment_id):
                                 ui.html(f'<b>Inoculum Concentration:</b> {batch.inoculum_concentration} %')
                             if batch.temperature is not None:
                                 ui.html(f'<b>Temperature:</b> {batch.temperature} °C')
-                            if batch.status:
-                                ui.html(f'<b>Status:</b> {batch.status}')
+                            #if batch.status:
+                            #    ui.html(f'<b>Status:</b> {batch.status}')
                         
                         # Action buttons moved here
                         with ui.row().classes('w-full justify-end mt-2'):
