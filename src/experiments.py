@@ -545,6 +545,7 @@ def create_experiment_edit_ui(experiment_id):
 
     with ui.grid(columns=2).classes('w-full gap-4 mt-2'):
         for batch in batches:
+            print(f"[DEBUG] {batch.name} sugar concentration: {batch.sugar_concentration}") # Debug output
             with ui.card().classes('w-full'):
                 with ui.row().classes('w-full justify-between items-center'):
                     ui.label(batch.name).classes('font-bold')
@@ -611,40 +612,24 @@ def create_experiment_edit_ui(experiment_id):
                     # Batch header with name and status
                     with ui.row().classes('w-full justify-between items-center'):
                         ui.label(batch.name).classes('font-bold')
-                    # Key parameters in a compact format
-                    with ui.row().classes('text-sm text-gray-600 mt-1'):
+                    # Full parameter listing
+                    with ui.column().classes('text-sm text-gray-700 mt-2'):
                         if batch.tea_type:
-                            ui.label(f'Tea: {batch.tea_type}')
-                        if batch.sugar_concentration:
-                            ui.label(f'Sugar: {batch.sugar_concentration}g/L')
-                        if batch.temperature:
-                            ui.label(f'Temp: {batch.temperature}°C')
-                    
-                    # Action buttons
-                    with ui.row().classes('w-full justify-end mt-2'):
-                        ui.button(
-                            'View Details',
-                            on_click=lambda b=batch.id: ui.run_javascript(f"window.location.href = '/batch/{b}'")
-                        ).classes('mr-2')
-                        
-                        # Only show Quick Edit if in Setup status
-                        ui.button(
-                            'Quick Edit',
-                            on_click=lambda b=batch.id: open_batch_edit_dialog(b)
-                        )
-        
-        # Add new batch button
-        async def handle_add_batch():
-            batch_name = f"Batch {len(batches) + 1}"
-            batch_id = await add_batch_to_experiment(experiment_id, batch_name)
-            if batch_id:
-                ui.notify('Batch added successfully', color='positive')
-                ui.run_javascript("window.location.reload()")
-            else:
-                ui.notify('Failed to add batch', color='negative')
-        
-        ui.button('+ Add Batch', on_click=handle_add_batch).classes('mt-4')
-        
+                            ui.label(f'Tea Type: {batch.tea_type}')
+                        if batch.tea_concentration is not None:
+                            ui.label(f'Tea Concentration: {batch.tea_concentration} g/L')
+                        if batch.water_amount is not None:
+                            ui.label(f'Water Amount: {batch.water_amount} mL')
+                        if batch.sugar_type:
+                            ui.label(f'Sugar Type: {batch.sugar_type}')
+                        if batch.sugar_concentration is not None:
+                            ui.label(f'Sugar Concentration: {batch.sugar_concentration} g/L')
+                        if batch.inoculum_concentration is not None:
+                            ui.label(f'Inoculum Concentration: {batch.inoculum_concentration} %')
+                        if batch.temperature is not None:
+                            ui.label(f'Temperature: {batch.temperature} °C')
+                        if batch.status:
+                            ui.label(f'Status: {batch.status}')
         ui.separator()
         
         # Experiment actions
