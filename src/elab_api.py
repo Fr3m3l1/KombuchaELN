@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Default API host
-DEFAULT_HOST = "https://elabftw.michaelscheidegger.ch/api/v2"
+DEFAULT_HOST = "https://elabftw.lsfm.zhaw.ch/api/v2"
+
+#"https://elabftw.michaelscheidegger.ch/api/v2"
 
 def initialize_api_client(api_key=None):
     """
