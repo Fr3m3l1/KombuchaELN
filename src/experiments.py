@@ -5,6 +5,73 @@ from src.templates import generate_experiment_html, generate_batch_dict_from_db_
 from src.elab_api import create_and_update_experiment
 import datetime
 
+# New function to duplicate a batch
+async def duplicate_batch(batch_id):
+    session = get_session()
+    try:
+        original = session.query(Batch).filter_by(id=batch_id).first()
+        if not original:
+            ui.notify('Original batch not found', color='negative')
+            return
+
+        new_batch = Batch(
+            experiment_id=original.experiment_id,
+            name=f'{original.name} (Copy)',
+            status='Setup',
+            tea_type=original.tea_type,
+            tea_concentration=original.tea_concentration,
+            water_amount=original.water_amount,
+            sugar_type=original.sugar_type,
+            sugar_concentration=original.sugar_concentration,
+            inoculum_concentration=original.inoculum_concentration,
+            temperature=original.temperature,
+        )
+
+        session.add(new_batch)
+        session.commit()
+
+        ui.notify('Batch duplicated successfully', color='positive')
+        ui.run_javascript("window.location.reload()")
+    except Exception as e:
+        session.rollback()
+        ui.notify(f"Error duplicating batch: {str(e)}", color='negative')
+    finally:
+        session.close()
+
+# Function to delete a batch
+async def delete_batch(batch_id):
+    session = get_session()
+    try:
+        batch = session.query(Batch).filter_by(id=batch_id).first()
+        if not batch:
+            ui.notify('Batch not found', color='negative')
+            return
+
+        session.delete(batch)
+        session.commit()
+
+        ui.notify('Batch deleted successfully', color='positive')
+        ui.run_javascript("window.location.reload()")
+    except Exception as e:
+        session.rollback()
+        ui.notify(f"Error deleting batch: {str(e)}", color='negative')
+    finally:
+        session.close()
+
+def open_delete_dialog(batch_id, batch_name):
+    with ui.dialog() as dialog, ui.card():
+        ui.label(f"Are you sure you want to delete {batch_name}?").classes("text-lg")
+
+        async def confirm_delete():
+            await delete_batch(batch_id)
+            dialog.close()
+
+        with ui.row().classes("justify-end w-full"):
+            ui.button('Cancel', on_click=dialog.close).classes('mr-2')
+            ui.button('Delete', color='red', on_click=confirm_delete)
+
+        dialog.open()
+
 async def create_experiment(title, num_batches):
     """
     Create a new experiment with the given title and number of batches
@@ -434,7 +501,7 @@ def create_experiment_list_ui():
                         # Action buttons
                         with ui.row().classes('w-full justify-end mt-2'):
                             ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
-                            ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e)).classes('mr-2')
+                            ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
         
         ui.button('Create New Experiment', on_click=lambda: ui.run_javascript("window.location.href = '/new-experiment'")).classes('mt-4')
 
@@ -458,7 +525,7 @@ def create_new_experiment_ui():
             else:
                 ui.notify('Failed to create experiment', color='negative')
         
-        ui.button('Create', on_click=handle_create).classes('mt-4')
+        ui.button('Create', on_click=handle_create, color='green').classes('mt-4')
         ui.button('Cancel', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mt-4 ml-2')
 
 def create_experiment_edit_ui(experiment_id):
@@ -475,7 +542,41 @@ def create_experiment_edit_ui(experiment_id):
         return
     
     batches = get_experiment_batches(experiment_id)
-    
+
+    with ui.grid(columns=2).classes('w-full gap-4 mt-2'):
+        for batch in batches:
+            print(f"[DEBUG] {batch.name} sugar concentration: {batch.sugar_concentration}") # Debug output
+            with ui.card().classes('w-full'):
+                with ui.row().classes('w-full justify-between items-center'):
+                    ui.label(batch.name).classes('font-bold')
+
+                with ui.row().classes('text-sm text-gray-600 mt-1'):
+                    if batch.tea_type:
+                        ui.label(f'Tea: {batch.tea_type}')
+                    if batch.sugar_concentration:
+                        ui.label(f'Sugar conc.: {batch.sugar_concentration}g/L')
+                    if batch.temperature:
+                        ui.label(f'Temp: {batch.temperature}°C')
+
+                with ui.row().classes('w-full justify-end mt-2'):
+                    ui.button(
+                        'View Details',
+                        on_click=lambda b=batch.id: ui.run_javascript(f"window.location.href = '/batch/{b}'")
+                    ).classes('mr-2')
+                    ui.button(
+                        'Quick Edit',
+                        on_click=lambda b=batch.id: open_batch_edit_dialog(b)
+                    ).classes('mr-2')
+                    ui.button(
+                        'Duplicate',
+                        on_click=lambda b=batch.id: duplicate_batch(b)
+                    ).classes('mr-2')
+                    ui.button(
+                        'Delete',
+                        on_click=lambda b_id=batch.id, b_name=batch.name: open_delete_dialog(b_id, b_name),
+                        color='red'
+    )
+
     with ui.card().classes('w-full'):
         # Header with experiment title and status
         with ui.row().classes('w-full justify-between items-center'):
@@ -510,41 +611,25 @@ def create_experiment_edit_ui(experiment_id):
                 with ui.card().classes('w-full'):
                     # Batch header with name and status
                     with ui.row().classes('w-full justify-between items-center'):
-                        ui.label(batch.name).classes('font-bold')
-                    # Key parameters in a compact format
-                    with ui.row().classes('text-sm text-gray-600 mt-1'):
+                        ui.label(batch.name).classes('font-bold text-lg')
+                    # Full parameter listing
+                    with ui.column().classes('text-sm text-gray-700 mt-2'):
                         if batch.tea_type:
-                            ui.label(f'Tea: {batch.tea_type}')
-                        if batch.sugar_concentration:
-                            ui.label(f'Sugar: {batch.sugar_concentration}g/L')
-                        if batch.temperature:
-                            ui.label(f'Temp: {batch.temperature}°C')
-                    
-                    # Action buttons
-                    with ui.row().classes('w-full justify-end mt-2'):
-                        ui.button(
-                            'View Details',
-                            on_click=lambda b=batch.id: ui.run_javascript(f"window.location.href = '/batch/{b}'")
-                        ).classes('mr-2')
-                        
-                        # Only show Quick Edit if in Setup status
-                        ui.button(
-                            'Quick Edit',
-                            on_click=lambda b=batch.id: open_batch_edit_dialog(b)
-                        )
-        
-        # Add new batch button
-        async def handle_add_batch():
-            batch_name = f"Batch {len(batches) + 1}"
-            batch_id = await add_batch_to_experiment(experiment_id, batch_name)
-            if batch_id:
-                ui.notify('Batch added successfully', color='positive')
-                ui.run_javascript("window.location.reload()")
-            else:
-                ui.notify('Failed to add batch', color='negative')
-        
-        ui.button('+ Add Batch', on_click=handle_add_batch).classes('mt-4')
-        
+                            ui.html(f'<b>Tea Type:</b> {batch.tea_type}')
+                        if batch.tea_concentration is not None:
+                            ui.html(f'<b>Tea Concentration:</b> {batch.tea_concentration} g/L')
+                        if batch.water_amount is not None:
+                            ui.html(f'<b>Water Amount:</b> {batch.water_amount} mL')
+                        if batch.sugar_type:
+                            ui.html(f'<b>Sugar Type:</b> {batch.sugar_type}')
+                        if batch.sugar_concentration is not None:
+                            ui.html(f'<b>Sugar Concentration:</b> {batch.sugar_concentration} g/L')
+                        if batch.inoculum_concentration is not None:
+                            ui.html(f'<b>Inoculum Concentration:</b> {batch.inoculum_concentration} %')
+                        if batch.temperature is not None:
+                            ui.html(f'<b>Temperature:</b> {batch.temperature} °C')
+                        if batch.status:
+                            ui.html(f'<b>Status:</b> {batch.status}')
         ui.separator()
         
         # Experiment actions
@@ -559,23 +644,25 @@ def create_experiment_edit_ui(experiment_id):
                     ui.notify('Experiment saved', color='positive')
                 else:
                     ui.notify('Failed to save experiment', color='negative')
-            
-            ui.button('Save Experiment', on_click=save_experiment).classes('mr-2')
-            ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id)).classes('mr-2')
-            
+
+            ui.button('Save Experiment', on_click=save_experiment, color='green').classes('mr-2')
+            ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id), color='indigo').classes('mr-2')
+
             # Workflow buttons
             ui.button(
                 'Workflow Tracking',
-                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'")
-            ).classes('mr-2 bg-blue-500 text-white')
-            
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'"),
+                color='purple'
+            ).classes('mr-2')
+
             ui.button(
                 'Configure Timepoints',
-                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'")
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'"),
+                color='pink'
             ).classes('mr-2')
-            
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
 
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+       
 def open_batch_edit_dialog(batch_id):
     """
     Open a dialog to edit batch parameters
@@ -621,7 +708,7 @@ def open_batch_edit_dialog(batch_id):
         
         with ui.row().classes('w-full justify-end'):
             ui.button('Cancel', on_click=dialog.close).classes('mr-2')
-            ui.button('Save', on_click=save_batch)
+            ui.button('Save', on_click=save_batch, color='green')
         
         dialog.open()
 

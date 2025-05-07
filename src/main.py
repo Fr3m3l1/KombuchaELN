@@ -15,15 +15,15 @@ def migrate_batch_status():
     try:
         print("Checking if batch status migration is needed...")
         inspector = inspect(engine)
-        
+
         # Check if batches table exists
         if 'batches' in inspector.get_table_names():
             # Check if status column already exists in batches table
             columns = [col['name'] for col in inspector.get_columns('batches')]
-            
+
             if 'status' not in columns:
                 print("Adding status column to batches table...")
-                
+
                 # Create the new column
                 with engine.begin() as conn:
                     conn.execute(sa.text(
@@ -48,21 +48,21 @@ def index():
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            
+
             with ui.row():
-                ui.button('API Key', on_click=lambda: ui.run_javascript("window.location.href = '/api-key'")).classes('mr-2')
-                
+                ui.button('API Key', on_click=lambda: ui.run_javascript("window.location.href = '/api-key'"), color='blue').classes('mr-2')
+
                 def handle_logout():
                     # Clear user from session
                     if 'username' in app.storage.user:
                         del app.storage.user['username']
                     # Navigate to login page
                     logout()
-                
-                ui.button('Logout', on_click=handle_logout)
-        
+
+                ui.button('Logout', on_click=handle_logout, color='red')
+
         ui.separator()
-        
+
         create_experiment_list_ui()
 
 @ui.page('/login')
@@ -83,10 +83,10 @@ def api_key_page():
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
-        
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+
         ui.separator()
-        
+
         create_api_key_ui()
 
 @ui.page('/new-experiment')
@@ -95,10 +95,10 @@ def new_experiment_page():
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
-        
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+
         ui.separator()
-        
+
         create_new_experiment_ui()
 
 @ui.page('/experiment/{experiment_id}')
@@ -107,10 +107,10 @@ def experiment_page(experiment_id: int):
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
-        
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+
         ui.separator()
-        
+
         create_experiment_edit_ui(experiment_id)
 
 @ui.page('/batch/{batch_id}')
@@ -119,10 +119,10 @@ def batch_page(batch_id: int):
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mr-2')
-        
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+
         ui.separator()
-        
+
         create_batch_detail_ui(batch_id)
 
 @ui.page('/experiment/{experiment_id}/workflow')
@@ -131,10 +131,10 @@ def experiment_workflow_page(experiment_id: int):
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            ui.button('Back to Experiment', on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}'")).classes('mr-2')
-        
+            ui.button('Back to Experiment', on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}'"), color='gray').classes('mr-2')
+
         ui.separator()
-        
+
         create_timepoint_workflow_ui(experiment_id)
 
 @ui.page('/experiment/{experiment_id}/timepoints')
@@ -143,10 +143,10 @@ def experiment_timepoints_page(experiment_id: int):
     with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
         with ui.row().classes('w-full justify-between items-center'):
             ui.label('Kombucha ELN').classes('text-3xl')
-            ui.button('Back to Experiment', on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}'")).classes('mr-2')
-        
+            ui.button('Back to Experiment', on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}'"), color='gray').classes('mr-2')
+
         ui.separator()
-        
+
         create_timepoint_config_ui(experiment_id)
 
 # Add custom CSS
@@ -157,12 +157,12 @@ def styles():
         font-family: 'Arial', sans-serif;
         background-color: #f5f5f5;
     }
-    
+
     .nicegui-card {
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         border-radius: 8px;
     }
-    
+
     .nicegui-button {
         border-radius: 4px;
     }

@@ -433,7 +433,7 @@ def create_timepoint_config_ui(experiment_id):
                     ui.label(str(tp.hours))
                     ui.label(tp.description or '')
                     ui.label(str(tp.order))
-                    ui.button('Delete', on_click=lambda t=tp.id: delete_timepoint(t))
+                    ui.button('Delete', on_click=lambda t=tp.id: delete_timepoint(t), color='red')
         else:
             ui.label('No timepoints defined yet').classes('text-gray-500')
         
@@ -467,7 +467,7 @@ def create_timepoint_config_ui(experiment_id):
             else:
                 ui.notify('Failed to add timepoint', color='negative')
         
-        ui.button('Add Timepoint', on_click=add_timepoint).classes('mt-2')
+        ui.button('Add Timepoint', on_click=add_timepoint, color='primary').classes('mt-2')
 
 async def delete_timepoint(timepoint_id):
     """
@@ -649,7 +649,7 @@ def create_timepoint_workflow_ui(experiment_id):
                 ui.label('Quick Actions:').classes('font-bold')
                 
                 # Create a card for each batch with quick action buttons
-                with ui.grid(columns=len(batches)).classes('w-full gap-4 mt-2'):
+                with ui.grid(columns=5).classes('w-full gap-4 mt-2'):
                     for batch in batches:
                         with ui.card().classes('p-4'):
                             ui.label(batch.name).classes('font-bold text-center')
@@ -709,9 +709,10 @@ def create_timepoint_workflow_ui(experiment_id):
                                         ui.label('PH Sample Collected').classes('text-green-500 text-center w-full')
                                     else:
                                         ui.button(
-                                            'Collect PH Sample', 
-                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='ph')
-                                        ).classes('bg-blue-500 text-white w-full')
+                                            'Collect PH Sample',
+                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='ph'), 
+                                            color='orange'
+                                        ).classes('text-white w-full')
 
                                     # MICRO Sample button
                                     if micro_collected:
@@ -719,8 +720,9 @@ def create_timepoint_workflow_ui(experiment_id):
                                     else:
                                         ui.button(
                                             'Collect MICRO Sample', 
-                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='micro')
-                                        ).classes('bg-blue-500 text-white w-full')
+                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='micro'),
+                                            color='yellow'
+                                        ).classes('text-black w-full')
 
                                     # HPLC Sample button
                                     if hplc_collected:
@@ -728,8 +730,9 @@ def create_timepoint_workflow_ui(experiment_id):
                                     else:
                                         ui.button(
                                             'Collect HPLC Sample', 
-                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='hplc')
-                                        ).classes('bg-blue-500 text-white w-full')
+                                            on_click=lambda b=batch.id: collect_samples(b_id=b, sample='hplc'),
+                                            color='black'
+                                        ).classes('text-white w-full')
                             
                             ui.separator().classes('my-2')
                             
@@ -739,21 +742,29 @@ def create_timepoint_workflow_ui(experiment_id):
                             with ui.grid(columns=3).classes('w-full gap-2 mt-2'):
                                 # pH Button
                                 async def record_ph(b_id=batch.id, t_id=current_timepoint.id):
-                                    # Open a simple dialog to enter pH value
-                                    with ui.dialog() as ph_dialog, ui.card():
+
+                                    # Declare the dialog in outer scope to close it later
+                                    ph_dialog = ui.dialog()
+
+                                    with ph_dialog, ui.card():
                                         ui.label(f'Record pH for {batch.name}').classes('text-lg font-bold')
-                                        ph_value = ui.number('pH Value', min=0, max=14, step=0.01).classes('w-full')
                                         
+                                        # Free-text input for precise validation
+                                        ph_input = ui.input('pH Value (0-14)').classes('w-full')
+                                        error_label = ui.label('').classes('text-red-500 text-sm')
+
                                         async def save_ph():
-                                            if ph_value.value is None:
-                                                ui.notify('Please enter a pH value', color='negative')
+                                            error_label.text = '' # Clear previous error
+                                            try:
+                                                value = float(ph_input.value)
+                                                if not (0 <= value <= 14):
+                                                    raise ValueError
+                                            except (ValueError, TypeError):
+                                                error_label.text = 'Invalid pH: please enter a value between 0 and 14.'
                                                 return
-                                                
-                                            success = await record_measurement(
-                                                b_id, 
-                                                t_id, 
-                                                ph_value=ph_value.value
-                                            )
+                                            
+                                            success = await record_measurement(b_id, t_id, ph_value=value)
+                                            
                                             if success:
                                                 ui.notify('pH value saved', color='positive')
                                                 ph_dialog.close()
@@ -763,15 +774,16 @@ def create_timepoint_workflow_ui(experiment_id):
                                         
                                         with ui.row().classes('w-full justify-end'):
                                             ui.button('Cancel', on_click=ph_dialog.close).classes('mr-2')
-                                            ui.button('Save', on_click=save_ph).classes('bg-green-500 text-white')
+                                            ui.button('Save', on_click=save_ph, color='green').classes('bg-green-500 text-white')
                                         
-                                        ph_dialog.open()
+                                    ph_dialog.open()
                                 
                                 ph_btn_color = 'bg-green-500' if measurement and measurement.ph_value else 'bg-blue-500'
                                 ph_btn_text = 'pH: Recorded' if measurement and measurement.ph_value else 'Record pH'
                                 ui.button(
                                     ph_btn_text, 
-                                    on_click=lambda b=batch.id: record_ph(b_id=b)
+                                    on_click=lambda b=batch.id: record_ph(b_id=b),
+                                    color='orange'
                                 ).classes(f'{ph_btn_color} text-white w-full')
                                 
                                 # Micro Button
@@ -799,7 +811,7 @@ def create_timepoint_workflow_ui(experiment_id):
                                         
                                         with ui.row().classes('w-full justify-end'):
                                             ui.button('Cancel', on_click=micro_dialog.close).classes('mr-2')
-                                            ui.button('Save', on_click=save_micro).classes('bg-green-500 text-white')
+                                            ui.button('Save', on_click=save_micro, color='green').classes('bg-green-500 text-white')
                                         
                                         micro_dialog.open()
                                 
@@ -807,8 +819,9 @@ def create_timepoint_workflow_ui(experiment_id):
                                 micro_btn_text = 'Micro: Recorded' if measurement and measurement.micro_results else 'Record Micro'
                                 ui.button(
                                     micro_btn_text, 
-                                    on_click=lambda b=batch.id: record_micro(b_id=b)
-                                ).classes(f'{micro_btn_color} text-white w-full')
+                                    on_click=lambda b=batch.id: record_micro(b_id=b),
+                                    color='yellow'
+                                ).classes(f'{micro_btn_color} text-black w-full')
                                 
                                 # HPLC Button
                                 async def record_hplc(b_id=batch.id, t_id=current_timepoint.id):
@@ -835,7 +848,7 @@ def create_timepoint_workflow_ui(experiment_id):
                                         
                                         with ui.row().classes('w-full justify-end'):
                                             ui.button('Cancel', on_click=hplc_dialog.close).classes('mr-2')
-                                            ui.button('Save', on_click=save_hplc).classes('bg-green-500 text-white')
+                                            ui.button('Save', on_click=save_hplc, color='green').classes('bg-green-500 text-white')
                                         
                                         hplc_dialog.open()
                                 
@@ -843,7 +856,8 @@ def create_timepoint_workflow_ui(experiment_id):
                                 hplc_btn_text = 'HPLC: Recorded' if measurement and measurement.hplc_results else 'Record HPLC'
                                 ui.button(
                                     hplc_btn_text, 
-                                    on_click=lambda b=batch.id: record_hplc(b_id=b)
+                                    on_click=lambda b=batch.id: record_hplc(b_id=b),
+                                    color='black'
                                 ).classes(f'{hplc_btn_color} text-white w-full')
                             
                             # SCOBY weights (only for final timepoint)
@@ -936,7 +950,9 @@ def create_timepoint_workflow_ui(experiment_id):
                             finally:
                                 session.close()
                         
-                        ui.button('Complete Experiment', on_click=complete_experiment).classes('bg-green-500 text-white')
+                        ui.button('Complete Experiment',
+                                  on_click=complete_experiment, color='red'
+                                ).classes('text-white')
                     else:
                         async def advance_timepoint():
                             next_timepoint_id = await advance_to_next_timepoint(experiment_id)
@@ -946,7 +962,10 @@ def create_timepoint_workflow_ui(experiment_id):
                             else:
                                 ui.notify('Failed to advance timepoint', color='negative')
                         
-                        ui.button('Advance to Next Timepoint', on_click=advance_timepoint).classes('bg-blue-500 text-white')
+                        ui.button('Advance to Next Timepoint',
+                                  on_click=advance_timepoint,
+                                  color='blue'
+                                ).classes('bg-blue-500 text-white')
         else:
             ui.label('No active timepoint').classes('text-lg font-bold mt-4')
             
@@ -1106,7 +1125,7 @@ def open_measurement_dialog(batch_id, timepoint_id):
                     else:
                         ui.notify('Failed to save pH value', color='negative')
                 
-                ui.button('Save pH Result', on_click=save_ph).classes('mt-2 bg-green-500 text-white')
+                ui.button('Save pH Result', on_click=save_ph, color='green').classes('mt-2 bg-green-500 text-white')
             
             # Microbiology Panel
             with ui.tab_panel(micro_tab):
@@ -1129,7 +1148,7 @@ def open_measurement_dialog(batch_id, timepoint_id):
                     else:
                         ui.notify('Failed to save microbiology results', color='negative')
                 
-                ui.button('Save Micro Results', on_click=save_micro).classes('mt-2 bg-green-500 text-white')
+                ui.button('Save Micro Results', on_click=save_micro, color='green').classes('mt-2 bg-green-500 text-white')
             
             # HPLC Panel
             with ui.tab_panel(hplc_tab):
@@ -1152,7 +1171,7 @@ def open_measurement_dialog(batch_id, timepoint_id):
                     else:
                         ui.notify('Failed to save HPLC results', color='negative')
                 
-                ui.button('Save HPLC Results', on_click=save_hplc).classes('mt-2 bg-green-500 text-white')
+                ui.button('Save HPLC Results', on_click=save_hplc, color='green').classes('mt-2 bg-green-500 text-white')
             
             # SCOBY Panel (only for final timepoint)
             if is_final_timepoint(timepoint_id):
@@ -1208,7 +1227,7 @@ def open_measurement_dialog(batch_id, timepoint_id):
                     else:
                         ui.notify('Failed to save notes', color='negative')
                 
-                ui.button('Save Notes', on_click=save_notes).classes('mt-2 bg-green-500 text-white')
+                ui.button('Save Notes', on_click=save_notes, color='green').classes('mt-2 bg-green-500 text-white')
         
         ui.separator().classes('my-4')
         
