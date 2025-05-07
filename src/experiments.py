@@ -543,40 +543,6 @@ def create_experiment_edit_ui(experiment_id):
     
     batches = get_experiment_batches(experiment_id)
 
-    with ui.grid(columns=2).classes('w-full gap-4 mt-2'):
-        for batch in batches:
-            print(f"[DEBUG] {batch.name} sugar concentration: {batch.sugar_concentration}") # Debug output
-            with ui.card().classes('w-full'):
-                with ui.row().classes('w-full justify-between items-center'):
-                    ui.label(batch.name).classes('font-bold')
-
-                with ui.row().classes('text-sm text-gray-600 mt-1'):
-                    if batch.tea_type:
-                        ui.label(f'Tea: {batch.tea_type}')
-                    if batch.sugar_concentration:
-                        ui.label(f'Sugar conc.: {batch.sugar_concentration}g/L')
-                    if batch.temperature:
-                        ui.label(f'Temp: {batch.temperature}°C')
-
-                with ui.row().classes('w-full justify-end mt-2'):
-                    ui.button(
-                        'View Details',
-                        on_click=lambda b=batch.id: ui.run_javascript(f"window.location.href = '/batch/{b}'")
-                    ).classes('mr-2')
-                    ui.button(
-                        'Quick Edit',
-                        on_click=lambda b=batch.id: open_batch_edit_dialog(b)
-                    ).classes('mr-2')
-                    ui.button(
-                        'Duplicate',
-                        on_click=lambda b=batch.id: duplicate_batch(b)
-                    ).classes('mr-2')
-                    ui.button(
-                        'Delete',
-                        on_click=lambda b_id=batch.id, b_name=batch.name: open_delete_dialog(b_id, b_name),
-                        color='red'
-    )
-
     with ui.card().classes('w-full'):
         # Header with experiment title and status
         with ui.row().classes('w-full justify-between items-center'):
@@ -605,31 +571,50 @@ def create_experiment_edit_ui(experiment_id):
         # Batches section
         ui.label('Batches').classes('text-xl mt-4')
         
-        # Grid layout for batch cards
-        with ui.grid(columns=2).classes('w-full gap-4 mt-2'):
+        # Grid layout for batch cards - changed to 1 column
+        with ui.grid(columns=1).classes('w-full gap-4 mt-2'):
             for batch in batches:
                 with ui.card().classes('w-full'):
-                    # Batch header with name and status
-                    with ui.row().classes('w-full justify-between items-center'):
-                        ui.label(batch.name).classes('font-bold text-lg')
-                    # Full parameter listing
-                    with ui.column().classes('text-sm text-gray-700 mt-2'):
-                        if batch.tea_type:
-                            ui.html(f'<b>Tea Type:</b> {batch.tea_type}')
-                        if batch.tea_concentration is not None:
-                            ui.html(f'<b>Tea Concentration:</b> {batch.tea_concentration} g/L')
-                        if batch.water_amount is not None:
-                            ui.html(f'<b>Water Amount:</b> {batch.water_amount} mL')
-                        if batch.sugar_type:
-                            ui.html(f'<b>Sugar Type:</b> {batch.sugar_type}')
-                        if batch.sugar_concentration is not None:
-                            ui.html(f'<b>Sugar Concentration:</b> {batch.sugar_concentration} g/L')
-                        if batch.inoculum_concentration is not None:
-                            ui.html(f'<b>Inoculum Concentration:</b> {batch.inoculum_concentration} %')
-                        if batch.temperature is not None:
-                            ui.html(f'<b>Temperature:</b> {batch.temperature} °C')
-                        if batch.status:
-                            ui.html(f'<b>Status:</b> {batch.status}')
+                    with ui.expansion(batch.name, icon='science').classes('w-full'):
+                        # Batch header with name and status (name is now in expansion header)
+                        # Full parameter listing
+                        with ui.column().classes('text-sm text-gray-700 mt-2'):
+                            if batch.tea_type:
+                                ui.html(f'<b>Tea Type:</b> {batch.tea_type}')
+                            if batch.tea_concentration is not None:
+                                ui.html(f'<b>Tea Concentration:</b> {batch.tea_concentration} g/L')
+                            if batch.water_amount is not None:
+                                ui.html(f'<b>Water Amount:</b> {batch.water_amount} mL')
+                            if batch.sugar_type:
+                                ui.html(f'<b>Sugar Type:</b> {batch.sugar_type}')
+                            if batch.sugar_concentration is not None:
+                                ui.html(f'<b>Sugar Concentration:</b> {batch.sugar_concentration} g/L')
+                            if batch.inoculum_concentration is not None:
+                                ui.html(f'<b>Inoculum Concentration:</b> {batch.inoculum_concentration} %')
+                            if batch.temperature is not None:
+                                ui.html(f'<b>Temperature:</b> {batch.temperature} °C')
+                            if batch.status:
+                                ui.html(f'<b>Status:</b> {batch.status}')
+                        
+                        # Action buttons moved here
+                        with ui.row().classes('w-full justify-end mt-2'):
+                            ui.button(
+                                'View Details',
+                                on_click=lambda b=batch.id: ui.run_javascript(f"window.location.href = '/batch/{b}'")
+                            ).classes('mr-2')
+                            ui.button(
+                                'Quick Edit',
+                                on_click=lambda b=batch.id: open_batch_edit_dialog(b)
+                            ).classes('mr-2')
+                            ui.button(
+                                'Duplicate',
+                                on_click=lambda b=batch.id: duplicate_batch(b)
+                            ).classes('mr-2')
+                            ui.button(
+                                'Delete',
+                                on_click=lambda b_id=batch.id, b_name=batch.name: open_delete_dialog(b_id, b_name),
+                                color='red'
+                            )
         ui.separator()
         
         # Experiment actions
