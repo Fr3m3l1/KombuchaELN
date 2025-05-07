@@ -536,7 +536,7 @@ def create_timepoint_workflow_ui(experiment_id):
     with ui.card().classes('w-full'):
         ui.label('Workflow Tracking').classes('text-xl font-bold')
         
-        # Timepoint navigation
+        # Timepoint navigation visualization (timeline)
         with ui.row().classes('w-full items-center mt-2'):
             for i, tp in enumerate(timepoints):
                 # Timepoint circle
@@ -562,6 +562,43 @@ def create_timepoint_workflow_ui(experiment_id):
         if current_timepoint:
             ui.label(f'Current Timepoint: {current_timepoint.name} ({current_timepoint.hours}h)').classes('text-lg font-bold mt-4')
             ui.label(current_timepoint.description).classes('text-gray-600')
+
+            # --- Timepoint Navigation Buttons ---
+            previous_tp = None
+            next_tp = None
+            for idx, tp in enumerate(timepoints):
+                if tp.id == current_timepoint.id:
+                    if idx > 0:
+                        previous_tp = timepoints[idx - 1]
+                    if idx < len(timepoints) - 1:
+                        next_tp = timepoints[idx + 1]
+                    break
+
+            with ui.row().classes('justify-between mt-4'):
+                if previous_tp:
+                    async def go_to_previous(tp_id=previous_tp.id):
+                        success = await set_current_timepoint(experiment_id, tp_id)
+                        if success:
+                            ui.notify(f'Moved to {previous_tp.name}', color='positive')
+                            ui.run_javascript("window.location.reload()")
+                        else:
+                            ui.notify('Failed to move to previous timepoint', color='negative')
+                    ui.button(f'← {previous_tp.name}', on_click=go_to_previous, color='gray')
+                else:
+                    ui.button('← No Previous').props('disabled')
+
+                if next_tp:
+                    async def go_to_next(tp_id=next_tp.id):
+                        success = await set_current_timepoint(experiment_id, tp_id)
+                        if success:
+                            ui.notify(f'Moved to {next_tp.name}', color='positive')
+                            ui.run_javascript("window.location.reload()")
+                        else:
+                            ui.notify('Failed to move to next timepoint', color='negative')
+                    ui.button(f'{next_tp.name} →', on_click=go_to_next, color='gray')
+                else:
+                    ui.button('No Next →').props('disabled')
+            # --- End Navigation Buttons ---
             
             # Measurements table
             with ui.card().classes('w-full mt-4'):
