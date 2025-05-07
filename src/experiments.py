@@ -554,7 +554,7 @@ def create_experiment_edit_ui(experiment_id):
                     if batch.tea_type:
                         ui.label(f'Tea: {batch.tea_type}')
                     if batch.sugar_concentration:
-                        ui.label(f'Sugar: {batch.sugar_concentration}g/L')
+                        ui.label(f'Sugar conc.: {batch.sugar_concentration}g/L')
                     if batch.temperature:
                         ui.label(f'Temp: {batch.temperature}°C')
 
@@ -611,25 +611,25 @@ def create_experiment_edit_ui(experiment_id):
                 with ui.card().classes('w-full'):
                     # Batch header with name and status
                     with ui.row().classes('w-full justify-between items-center'):
-                        ui.label(batch.name).classes('font-bold')
+                        ui.label(batch.name).classes('font-bold text-lg')
                     # Full parameter listing
                     with ui.column().classes('text-sm text-gray-700 mt-2'):
                         if batch.tea_type:
-                            ui.label(f'Tea Type: {batch.tea_type}')
+                            ui.html(f'<b>Tea Type:</b> {batch.tea_type}')
                         if batch.tea_concentration is not None:
-                            ui.label(f'Tea Concentration: {batch.tea_concentration} g/L')
+                            ui.html(f'<b>Tea Concentration:</b> {batch.tea_concentration} g/L')
                         if batch.water_amount is not None:
-                            ui.label(f'Water Amount: {batch.water_amount} mL')
+                            ui.html(f'<b>Water Amount:</b> {batch.water_amount} mL')
                         if batch.sugar_type:
-                            ui.label(f'Sugar Type: {batch.sugar_type}')
+                            ui.html(f'<b>Sugar Type:</b> {batch.sugar_type}')
                         if batch.sugar_concentration is not None:
-                            ui.label(f'Sugar Concentration: {batch.sugar_concentration} g/L')
+                            ui.html(f'<b>Sugar Concentration:</b> {batch.sugar_concentration} g/L')
                         if batch.inoculum_concentration is not None:
-                            ui.label(f'Inoculum Concentration: {batch.inoculum_concentration} %')
+                            ui.html(f'<b>Inoculum Concentration:</b> {batch.inoculum_concentration} %')
                         if batch.temperature is not None:
-                            ui.label(f'Temperature: {batch.temperature} °C')
+                            ui.html(f'<b>Temperature:</b> {batch.temperature} °C')
                         if batch.status:
-                            ui.label(f'Status: {batch.status}')
+                            ui.html(f'<b>Status:</b> {batch.status}')
         ui.separator()
         
         # Experiment actions
