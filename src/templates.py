@@ -1,3 +1,41 @@
+from src.timepoints import get_batch_measurement
+
+def generate_batch_dict_from_db_batch(batch, timepoints=None):
+    batch_dict = {
+        'name': batch.name,
+        'tea_type': batch.tea_type,
+        'tea_concentration': batch.tea_concentration,
+        'water_amount': batch.water_amount,
+        'sugar_type': batch.sugar_type,
+        'sugar_concentration': batch.sugar_concentration,
+        'inoculum_concentration': batch.inoculum_concentration,
+        'temperature': batch.temperature,
+        'status': batch.status,
+        'measurements': []
+    }
+
+    if timepoints:
+        for tp in timepoints:
+            m = get_batch_measurement(batch.id, tp.id)
+            if m:
+                measurement_data = {
+                    'timepoint': tp.name,
+                    'ph_value': m.ph_value,
+                    'ph_sample_time': m.ph_sample_time,
+                    'micro_results': m.micro_results,
+                    'micro_sample_time': m.micro_sample_time,
+                    'hplc_results': m.hplc_results,
+                    'hplc_sample_time': m.hplc_sample_time,
+                    'scoby_wet_weight': m.scoby_wet_weight,
+                    'scoby_dry_weight': m.scoby_dry_weight,
+                    'notes': m.notes,
+                    'completed': m.completed
+                }
+                batch_dict['measurements'].append(measurement_data)
+
+    return batch_dict
+
+
 def generate_experiment_html(experiment_title, samples):
     """
     Generate HTML content for an experiment with samples
@@ -200,7 +238,10 @@ def generate_experiment_html(experiment_title, samples):
             changes in pH, microbial composition, and metabolite production.
         </p>
         
+        <p>
         <div class="section-title">Experimental Setup</div>
+        <p>
+
         <table>
             <thead>
                 <tr>
@@ -233,130 +274,65 @@ def generate_experiment_html(experiment_title, samples):
                 <td>{status}</td>
             </tr>
         """
-    
-    html += """
-            </tbody>
-        </table>
-        
-        <div class="section-title">Workflow Timeline</div>
-        <div class="workflow-timeline">
-    """
-    
-    # Add workflow timeline visualization
-    timepoints = ["Preparation", "Incubation Start", "Sampling", "Analysis", "Completion"]
-    current_point = 0
-    
-    # Determine current point based on sample statuses
-    if any(sample.get('status') == "Completed" for sample in samples):
-        current_point = 4
-    elif samples_with_results > 0:
-        current_point = 3
-    elif any(sample.get('status') in ["Sampling", "Analysis Pending"] for sample in samples):
-        current_point = 2
-    elif any(sample.get('status') == "Incubating" for sample in samples):
-        current_point = 1
-    elif any(sample.get('status') == "Prepared" for sample in samples):
-        current_point = 0
-    
-    for i, point in enumerate(timepoints):
-        point_class = "completed" if i < current_point else ("current" if i == current_point else "")
-        connector_class = "completed" if i < current_point else ""
-        
-        html += f"""
-            <div class="timeline-point {point_class}">
-                {i+1}
-                <div class="timeline-label">{point}</div>
-            </div>
-        """
-        
-        # Add connector if not the last point
-        if i < len(timepoints) - 1:
-            html += f'<div class="timeline-connector {connector_class}"></div>'
-    
+
     html += """
         </div>
     </div>
     
     <div class="report-section">
+    <p>
         <div class="section-title">Results</div>
+    <p>
     """
     
-    # Check if we have any measurement data to display
-    has_measurements = False
-    for sample in samples:
-        if (sample.get('ph_value') or sample.get('micro_results') or 
-            sample.get('hplc_results') or sample.get('scoby_wet_weight')):
-            has_measurements = True
-            break
-    
+    # Check if we have any measurement data in any sample at any timepoint
+    has_measurements = any(
+        m.get('ph_value') or m.get('micro_results') or m.get('hplc_results') or m.get('scoby_wet_weight')
+        for sample in samples
+        for m in sample.get('measurements', [])
+    )
+
     if has_measurements:
-        # Display measurement data
         html += """
-        <div class="section-title">pH Measurements</div>
-        <div class="chart-placeholder">
-            [pH measurements chart would be displayed here]
-        </div>
-        
-        <div class="section-title">Batch Measurements</div>
         <table>
             <thead>
                 <tr>
-                    <th>Batch/Sample</th>
-                    <th>pH Value</th>
-                    <th>SCOBY Wet Weight (g)</th>
-                    <th>SCOBY Dry Weight (g)</th>
+                    <th>Batch</th>
+                    <th>Timepoint</th>
+                    <th>pH</th>
+                    <th>pH Sample Time</th>
+                    <th>Microbiology</th>
+                    <th>Micro Sample Time</th>
+                    <th>HPLC</th>
+                    <th>HPLC Sample Time</th>
+                    <th>SCOBY Wet (g)</th>
+                    <th>SCOBY Dry (g)</th>
+                    <th>Notes</th>
                 </tr>
             </thead>
             <tbody>
         """
-        
         for sample in samples:
-            ph_value = sample.get('ph_value', 'N/A')
-            scoby_wet = sample.get('scoby_wet_weight', 'N/A')
-            scoby_dry = sample.get('scoby_dry_weight', 'N/A')
-            
-            html += f"""
+            for m in sample.get('measurements', []):
+                html += f"""
                 <tr>
-                    <td>{sample.get('name', '')}</td>
-                    <td>{ph_value}</td>
-                    <td>{scoby_wet}</td>
-                    <td>{scoby_dry}</td>
+                    <td>{sample.get('name')}</td>
+                    <td>{m.get('timepoint')}</td>
+                    <td>{m.get('ph_value') or 'N/A'}</td>
+                    <td>{m.get('ph_sample_time').strftime('%Y-%m-%d %H:%M') if m.get('ph_sample_time') else 'N/A'}</td>
+                    <td>{(m.get('micro_results')[:30] + '...') if m.get('micro_results') else 'N/A'}</td>
+                    <td>{m.get('micro_sample_time').strftime('%Y-%m-%d %H:%M') if m.get('micro_sample_time') else 'N/A'}</td>
+                    <td>{(m.get('hplc_results')[:30] + '...') if m.get('hplc_results') else 'N/A'}</td>
+                    <td>{m.get('hplc_sample_time').strftime('%Y-%m-%d %H:%M') if m.get('hplc_sample_time') else 'N/A'}</td>
+                    <td>{m.get('scoby_wet_weight') or 'N/A'}</td>
+                    <td>{m.get('scoby_dry_weight') or 'N/A'}</td>
+                    <td>{m.get('notes') or '—'}</td>
                 </tr>
-            """
-        
+                """
         html += """
             </tbody>
         </table>
-        
-        <div class="section-title">Microbiology Results</div>
         """
-        
-        # Display microbiology results if available
-        for sample in samples:
-            if sample.get('micro_results'):
-                html += f"""
-                <div class="timepoint-card">
-                    <div class="timepoint-header">{sample.get('name', '')}</div>
-                    <pre>{sample.get('micro_results', '')}</pre>
-                </div>
-                """
-        
-        html += """
-        <div class="section-title">HPLC Results</div>
-        <div class="chart-placeholder">
-            [HPLC results chart would be displayed here]
-        </div>
-        """
-        
-        # Display HPLC results if available
-        for sample in samples:
-            if sample.get('hplc_results'):
-                html += f"""
-                <div class="timepoint-card">
-                    <div class="timepoint-header">{sample.get('name', '')}</div>
-                    <pre>{sample.get('hplc_results', '')}</pre>
-                </div>
-                """
     else:
         html += """
         <p>No measurement data is available yet. Results will be displayed here once measurements are recorded.</p>
@@ -366,7 +342,9 @@ def generate_experiment_html(experiment_title, samples):
     </div>
     
     <div class="report-section">
+    <p>
         <div class="section-title">Discussion</div>
+    </p>
         <p>
             This section should contain an interpretation of the results, comparing the different batches
             and discussing how the various parameters affected the fermentation process and final product.
@@ -438,15 +416,9 @@ def generate_sample_dict_from_db_sample(sample):
         'temperature': sample.temperature
     }
 
-def generate_batch_dict_from_db_batch(batch):
+def generate_batch_dict_from_db_batch(batch, timepoints=None):
     """
-    Convert a database Batch object to a dictionary for HTML generation
-    
-    Args:
-        batch: A Batch object from the database
-        
-    Returns:
-        Dictionary with batch parameters and workflow data
+    Convert a Batch object to a dictionary including measurement data for all timepoints.
     """
     batch_dict = {
         'name': batch.name,
@@ -457,53 +429,27 @@ def generate_batch_dict_from_db_batch(batch):
         'sugar_concentration': batch.sugar_concentration,
         'inoculum_concentration': batch.inoculum_concentration,
         'temperature': batch.temperature,
-        'status': batch.status
+        'status': batch.status,
+        'measurements': []
     }
-    
-    # Add workflow data if available
-    if hasattr(batch, 'preparation_time') and batch.preparation_time:
-        batch_dict['preparation_time'] = batch.preparation_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'incubation_start_time') and batch.incubation_start_time:
-        batch_dict['incubation_start_time'] = batch.incubation_start_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'incubation_end_time') and batch.incubation_end_time:
-        batch_dict['incubation_end_time'] = batch.incubation_end_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'sample_split_time') and batch.sample_split_time:
-        batch_dict['sample_split_time'] = batch.sample_split_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'micro_plating_time') and batch.micro_plating_time:
-        batch_dict['micro_plating_time'] = batch.micro_plating_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'micro_results') and batch.micro_results:
-        batch_dict['micro_results'] = batch.micro_results
-    
-    if hasattr(batch, 'hplc_prep_time') and batch.hplc_prep_time:
-        batch_dict['hplc_prep_time'] = batch.hplc_prep_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'hplc_results') and batch.hplc_results:
-        batch_dict['hplc_results'] = batch.hplc_results
-    
-    if hasattr(batch, 'ph_measurement_time') and batch.ph_measurement_time:
-        batch_dict['ph_measurement_time'] = batch.ph_measurement_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'ph_value') and batch.ph_value:
-        batch_dict['ph_value'] = batch.ph_value
-    
-    if hasattr(batch, 'scoby_wet_weight_time') and batch.scoby_wet_weight_time:
-        batch_dict['scoby_wet_weight_time'] = batch.scoby_wet_weight_time.strftime('%Y-%m-%d %H:%M')
-    
-    if hasattr(batch, 'scoby_wet_weight') and batch.scoby_wet_weight:
-        batch_dict['scoby_wet_weight'] = batch.scoby_wet_weight
-    
-    if hasattr(batch, 'scoby_dry_weight') and batch.scoby_dry_weight:
-        batch_dict['scoby_dry_weight'] = batch.scoby_dry_weight
-    
-    if hasattr(batch, 'temperature_logger_ids') and batch.temperature_logger_ids:
-        batch_dict['temperature_logger_ids'] = batch.temperature_logger_ids
-    
-    if hasattr(batch, 'notes') and batch.notes:
-        batch_dict['notes'] = batch.notes
-    
+
+    if timepoints:
+        for tp in timepoints:
+            m = get_batch_measurement(batch.id, tp.id)
+            if m:
+                measurement_data = {
+                    'timepoint': tp.name,
+                    'ph_value': m.ph_value,
+                    'ph_sample_time': m.ph_sample_time,
+                    'micro_results': m.micro_results,
+                    'micro_sample_time': m.micro_sample_time,
+                    'hplc_results': m.hplc_results,
+                    'hplc_sample_time': m.hplc_sample_time,
+                    'scoby_wet_weight': m.scoby_wet_weight,
+                    'scoby_dry_weight': m.scoby_dry_weight,
+                    'notes': m.notes,
+                    'completed': m.completed
+                }
+                batch_dict['measurements'].append(measurement_data)
+
     return batch_dict

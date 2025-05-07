@@ -384,14 +384,15 @@ async def sync_experiment_with_elabftw(experiment_id):
     Sync an experiment with eLabFTW.
     If elab_id exists, update the experiment.
     Otherwise, create a new one.
-    
+
     Args:
         experiment_id: The ID of the experiment
-        
+
     Returns:
         True if sync was successful, False otherwise
     """
-    from src.timepoints import get_experiment_timepoints, get_batch_measurement
+    from src.timepoints import get_experiment_timepoints
+    from src.templates import generate_batch_dict_from_db_batch
 
     current_user = get_current_user()
     if current_user is None or not current_user.elab_api_key:
@@ -407,31 +408,11 @@ async def sync_experiment_with_elabftw(experiment_id):
 
         batches = session.query(Batch).filter_by(experiment_id=experiment_id).all()
         timepoints = get_experiment_timepoints(experiment_id)
-        final_tp_id = timepoints[-1].id if timepoints else None
 
-        # Combine batch metadata with measurement data
+        # Build a list of batch dicts with measurements from all timepoints
         batch_dicts = []
         for batch in batches:
-            batch_dict = generate_batch_dict_from_db_batch(batch)
-
-            # Pull in measurements across timepoints
-            for tp in timepoints:
-                m = get_batch_measurement(batch.id, tp.id)
-                if m:
-                    if m.ph_value is not None:
-                        batch_dict['ph_value'] = m.ph_value
-                    if m.micro_results:
-                        batch_dict['micro_results'] = m.micro_results
-                    if m.hplc_results:
-                        batch_dict['hplc_results'] = m.hplc_results
-                    if tp.id == final_tp_id:
-                        if m.scoby_wet_weight is not None:
-                            batch_dict['scoby_wet_weight'] = m.scoby_wet_weight
-                        if m.scoby_dry_weight is not None:
-                            batch_dict['scoby_dry_weight'] = m.scoby_dry_weight
-                    if m.notes:
-                        batch_dict['notes'] = m.notes
-
+            batch_dict = generate_batch_dict_from_db_batch(batch, timepoints=timepoints)
             batch_dicts.append(batch_dict)
 
         # Generate full HTML report
@@ -480,7 +461,6 @@ async def sync_experiment_with_elabftw(experiment_id):
         return False
     finally:
         session.close()
-
 
 def create_experiment_list_ui():
     """Create the UI for listing experiments"""
