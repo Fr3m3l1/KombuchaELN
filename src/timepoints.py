@@ -648,8 +648,12 @@ def create_timepoint_workflow_ui(experiment_id):
                 ui.label('').classes('mt-4')  # Add some spacing
                 ui.label('Quick Actions:').classes('font-bold')
                 
+                # Calculate the number of columns based on the number of batches
+                # Use a responsive grid with maximum 4 columns
+                num_columns = min(4, len(batches))
+                
                 # Create a card for each batch with quick action buttons
-                with ui.grid(columns=5).classes('w-full gap-4 mt-2'):
+                with ui.grid(columns=num_columns).classes('w-full gap-4 mt-2'):
                     for batch in batches:
                         with ui.card().classes('p-4'):
                             ui.label(batch.name).classes('font-bold text-center')
