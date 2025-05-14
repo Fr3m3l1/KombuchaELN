@@ -937,7 +937,7 @@ def create_batch_detail_ui(batch_id):
     with ui.card().classes('w-full mt-4'):
         ui.label('Key Parameters').classes('text-xl font-bold')
         
-        with ui.grid(columns=4).classes('w-full gap-4 mt-2'):
+        with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2'):
             ui.label(f'Tea Type: {batch.tea_type or "N/A"}')
             ui.label(f'Tea Concentration: {batch.tea_concentration or "N/A"} g/L')
             ui.label(f'Water Amount: {batch.water_amount or "N/A"} mL')

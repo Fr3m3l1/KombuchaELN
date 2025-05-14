@@ -587,17 +587,19 @@ def create_timepoint_workflow_ui(experiment_id):
                 else:
                     ui.button('← No Previous').props('disabled')
 
-                if next_tp:
-                    async def go_to_next(tp_id=next_tp.id):
-                        success = await set_current_timepoint(experiment_id, tp_id)
-                        if success:
-                            ui.notify(f'Moved to {next_tp.name}', color='positive')
-                            ui.run_javascript("window.location.reload()")
-                        else:
-                            ui.notify('Failed to move to next timepoint', color='negative')
-                    ui.button(f'{next_tp.name} →', on_click=go_to_next, color='gray')
-                else:
-                    ui.button('No Next →').props('disabled')
+                # Next button wrapper for mobile full width
+                with ui.element('div').classes('w-full sm:w-auto'):
+                    if next_tp:
+                        async def go_to_next(tp_id=next_tp.id):
+                            success = await set_current_timepoint(experiment_id, tp_id)
+                            if success:
+                                ui.notify(f'Moved to {next_tp.name}', color='positive')
+                                ui.run_javascript("window.location.reload()")
+                            else:
+                                ui.notify('Failed to move to next timepoint', color='negative')
+                        ui.button(f'{next_tp.name} →', on_click=go_to_next, color='gray').classes('w-full')
+                    else:
+                        ui.button('No Next →').props('disabled').classes('w-full')
             # --- End Navigation Buttons ---
             
             # Measurements table
@@ -674,23 +676,20 @@ def create_timepoint_workflow_ui(experiment_id):
                 
                 # Create the table without the actions column
                 columns.pop()  # Remove the actions column
-                
-                table = ui.table(
-                    columns=columns,
-                    rows=rows,
-                    row_key='batch'
-                ).classes('w-full')
+                  # Wrap table in a div with overflow-auto for mobile scrolling
+                with ui.element('div').classes('w-full overflow-x-auto'):
+                    table = ui.table(
+                        columns=columns,
+                        rows=rows,
+                        row_key='batch'
+                    ).classes('w-full')
                 
                 # Add action buttons for each batch with direct test recording
                 ui.label('').classes('mt-4')  # Add some spacing
                 ui.label('Quick Actions:').classes('font-bold')
-                
-                # Calculate the number of columns based on the number of batches
-                # Use a responsive grid with maximum 4 columns
-                num_columns = min(4, len(batches))
-                
+                  # Use a responsive grid layout based on screen width
                 # Create a card for each batch with quick action buttons
-                with ui.grid(columns=num_columns).classes('w-full gap-4 mt-2'):
+                with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2'):
                     for batch in batches:
                         with ui.card().classes('p-4'):
                             ui.label(batch.name).classes('font-bold text-center')
@@ -780,7 +779,7 @@ def create_timepoint_workflow_ui(experiment_id):
                             # Test result buttons
                             ui.label('Record Test Results:').classes('text-center mt-2')
                             
-                            with ui.grid(columns=3).classes('w-full gap-2 mt-2'):
+                            with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2'):
                                 # pH Button
                                 async def record_ph(b_id=batch.id, t_id=current_timepoint.id):
 
@@ -978,9 +977,8 @@ def create_timepoint_workflow_ui(experiment_id):
                                 'Advanced Options', 
                                 on_click=lambda b=batch.id, t=current_timepoint.id: open_measurement_dialog(b, t)
                             ).classes('bg-gray-500 text-white w-full mt-2')
-            
-            # Timepoint navigation buttons
-            with ui.row().classes('w-full justify-between mt-4'):
+              # Timepoint navigation buttons - full width on mobile
+            with ui.element('div').classes('w-full mt-4'):
                 # Check if all measurements are completed
                 all_completed = is_timepoint_completed(current_timepoint.id)
                 
@@ -1004,9 +1002,10 @@ def create_timepoint_workflow_ui(experiment_id):
                             finally:
                                 session.close()
                         
+                        # Full width button on mobile
                         ui.button('Complete Experiment',
                                   on_click=complete_experiment, color='red'
-                                ).classes('text-white')
+                                ).classes('text-white w-full')
                     else:
                         async def advance_timepoint():
                             next_timepoint_id = await advance_to_next_timepoint(experiment_id)
@@ -1016,10 +1015,11 @@ def create_timepoint_workflow_ui(experiment_id):
                             else:
                                 ui.notify('Failed to advance timepoint', color='negative')
                         
+                        # Full width button on mobile
                         ui.button('Advance to Next Timepoint',
                                   on_click=advance_timepoint,
                                   color='blue'
-                                ).classes('bg-blue-500 text-white')
+                                ).classes('bg-blue-500 text-white w-full')
         else:
             ui.label('No active timepoint').classes('text-lg font-bold mt-4')
             
@@ -1051,7 +1051,7 @@ def create_timepoint_workflow_ui(experiment_id):
                 finally:
                     session.close()
             
-            ui.button('Start Workflow', on_click=start_workflow).classes('bg-blue-500 text-white')
+            ui.button('Start Workflow', on_click=start_workflow).classes('bg-blue-500 text-white w-full')
 
 def open_measurement_dialog(batch_id, timepoint_id):
     """
@@ -1070,8 +1070,7 @@ def open_measurement_dialog(batch_id, timepoint_id):
     
     # Get existing measurement
     measurement = get_batch_measurement(batch_id, timepoint_id)
-    
-    with ui.dialog() as dialog, ui.card():
+    with ui.dialog() as dialog, ui.card().classes('max-w-full w-full sm:max-w-lg md:max-w-xl p-4'):
         ui.label(f'Record Measurements for {batch.name} at {timepoint.name}').classes('text-xl font-bold')
         
         # Sample Collection Tracking Section
@@ -1104,9 +1103,8 @@ def open_measurement_dialog(batch_id, timepoint_id):
                     ui.notify('Failed to clear sample collection times', color='negative')
             
             ui.button('Clear Collection Times', on_click=clear_all_samples).classes('mt-2 bg-red-500 text-white')
-        else:
-            # Show which samples are collected
-            with ui.row().classes('w-full gap-2 mt-2'):
+        else:            # Show which samples are collected
+            with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2'):
                 if measurement and measurement.ph_sample_time:
                     ui.label('pH: Collected').classes('text-green-500')
                 else:
@@ -1147,13 +1145,15 @@ def open_measurement_dialog(batch_id, timepoint_id):
         ui.label('Test Results').classes('text-lg font-bold')
         ui.label('Enter results for each test').classes('text-sm text-gray-600')
         
-        with ui.tabs().classes('w-full') as tabs:
-            ph_tab = ui.tab('pH')
-            micro_tab = ui.tab('Microbiology')
-            hplc_tab = ui.tab('HPLC')
-            if is_final_timepoint(timepoint_id):
-                scoby_tab = ui.tab('SCOBY')
-            notes_tab = ui.tab('Notes')
+        # Wrap tabs in a scroll container for mobile
+        with ui.element('div').classes('w-full overflow-x-auto'):
+            with ui.tabs().classes('w-full min-w-[400px]') as tabs:
+                ph_tab = ui.tab('pH')
+                micro_tab = ui.tab('Microbiology')
+                hplc_tab = ui.tab('HPLC')
+                if is_final_timepoint(timepoint_id):
+                    scoby_tab = ui.tab('SCOBY')
+                notes_tab = ui.tab('Notes')
         
         with ui.tab_panels(tabs, value=ph_tab).classes('w-full'):
             # pH Panel

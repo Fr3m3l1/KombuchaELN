@@ -151,8 +151,7 @@ def experiment_timepoints_page(experiment_id: int):
 
 # Add custom CSS
 @ui.page('/styles.css')
-def styles():
-    return """
+def styles():    return """
     body {
         font-family: 'Arial', sans-serif;
         background-color: #f5f5f5;
@@ -165,6 +164,43 @@ def styles():
 
     .nicegui-button {
         border-radius: 4px;
+    }    /* Mobile-specific styles */
+    @media (max-width: 640px) {
+        .nicegui-button {
+            width: 100%; /* Full width buttons on small screens */
+        }
+        
+        .ui-table {
+            overflow-x: auto; /* Allow tables to scroll horizontally on small screens */
+        }
+        
+        /* Ensure adequate touch target size */
+        button, 
+        [role="button"], 
+        input[type="button"], 
+        input[type="submit"], 
+        input[type="reset"] {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        /* Make inputs more touch-friendly */
+        input,
+        select,
+        textarea {
+            font-size: 16px !important; /* Prevent iOS zoom on focus */
+            padding: 10px !important;
+        }
+        
+        /* Better spacing for form elements on mobile */
+        .q-field {
+            margin-bottom: 16px !important;
+        }
+
+        /* Ensure dialogs don't exceed screen width */
+        .q-dialog__inner {
+            max-width: 90vw !important;
+        }
     }
     """
 
