@@ -449,11 +449,13 @@ async def sync_experiment_with_elabftw(experiment_id):
             if elab_experiment:
                 experiment.elab_id = elab_experiment.id
                 session.commit()
+                # Reload the page to show updated sync status
+                ui.run_javascript("window.location.reload()")
                 ui.notify(f"Experiment synced with eLabFTW (ID: {elab_experiment.id})", color='positive')
             else:
                 ui.notify("Failed to sync with eLabFTW", color='negative')
                 return False
-
+        
         return True
     except Exception as e:
         session.rollback()
@@ -466,14 +468,14 @@ def create_experiment_list_ui():
     """Create the UI for listing experiments"""
     with ui.card().classes('w-full'):
         ui.label('My Experiments').classes('text-2xl')
-        
+
         # Add filter/sort controls
         with ui.row().classes('w-full items-center mb-4'):
             status_filter = ui.select(
                 ['All', 'Planning', 'Running', 'Analysis', 'Completed'],
                 value='All',
                 label='Filter by Status'
-            ).classes('mr-4')
+            ).classes('mr-4 min-w-32')
             
             sort_by = ui.select(
                 ['Newest First', 'Oldest First', 'Title A-Z', 'Title Z-A'],
@@ -481,49 +483,81 @@ def create_experiment_list_ui():
                 label='Sort by'
             )
         
-        experiments = get_user_experiments()
+        # Get all experiments first
+        all_experiments = get_user_experiments()
         
-        if not experiments:
-            ui.label('No experiments found').classes('text-gray-500')
-        else:
-            # Create a card-based layout instead of a simple grid
-            with ui.grid(columns=3).classes('w-full gap-4'):
-                for exp in experiments:
-                    with ui.card().classes('w-full'):
-                        # Status indicator
-                        status = getattr(exp, 'status', 'Planning')
-                        status_colors = {
-                            'Planning': 'blue',
-                            'Running': 'orange',
-                            'Analysis': 'purple',
-                            'Completed': 'green'
-                        }
-                        status_color = status_colors.get(status, 'gray')
-                        
-                        with ui.row().classes('w-full justify-between items-center'):
-                            ui.label(exp.title).classes('text-xl font-bold')
-                            ui.label(status).classes(f'text-{status_color}-500 font-bold')
-                        
-                        ui.label(f'Created: {exp.created_at.strftime("%Y-%m-%d %H:%M")}')
-                        
-                        # Count batches
-                        session = get_session()
-                        try:
-                            batch_count = session.query(Batch).filter_by(experiment_id=exp.id).count()
-                            ui.label(f'{batch_count} Batches')
-                        finally:
-                            session.close()
-                        
-                        # eLabFTW status
-                        if exp.elab_id:
-                            ui.label(f'Synced with eLabFTW (ID: {exp.elab_id})').classes('text-green-500')
-                        else:
-                            ui.label('Not synced with eLabFTW').classes('text-gray-500')
-                        
-                        # Action buttons
-                        with ui.row().classes('w-full justify-end mt-2'):
-                            ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
-                            ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
+        # Grid container that will be refreshed when filters change
+        experiment_grid_container = ui.element('div').classes('w-full')
+        
+        def apply_filters_and_sort():
+            """Apply filters and sort to the experiment list"""
+            # Clear the container
+            experiment_grid_container.clear()
+            
+            # Filter experiments
+            filtered_experiments = all_experiments
+            if status_filter.value != 'All':
+                filtered_experiments = [exp for exp in filtered_experiments if getattr(exp, 'status', 'Planning') == status_filter.value]
+            
+            # Sort experiments
+            if sort_by.value == 'Newest First':
+                filtered_experiments.sort(key=lambda x: x.created_at, reverse=True)
+            elif sort_by.value == 'Oldest First':
+                filtered_experiments.sort(key=lambda x: x.created_at)
+            elif sort_by.value == 'Title A-Z':
+                filtered_experiments.sort(key=lambda x: x.title.lower())
+            elif sort_by.value == 'Title Z-A':
+                filtered_experiments.sort(key=lambda x: x.title.lower(), reverse=True)
+            
+            # Display filtered and sorted experiments
+            with experiment_grid_container:
+                if not filtered_experiments:
+                    ui.label('No experiments found matching filters').classes('text-gray-500')
+                else:
+                    # Create a card-based layout
+                    with ui.grid(columns=3).classes('w-full gap-4'):
+                        for exp in filtered_experiments:
+                            with ui.card().classes('w-full'):
+                                # Status indicator
+                                status = getattr(exp, 'status', 'Planning')
+                                status_colors = {
+                                    'Planning': 'blue',
+                                    'Running': 'orange',
+                                    'Analysis': 'purple',
+                                    'Completed': 'green'
+                                }
+                                status_color = status_colors.get(status, 'gray')
+                                
+                                with ui.row().classes('w-full justify-between items-center'):
+                                    ui.label(exp.title).classes('text-xl font-bold')
+                                    ui.label(status).classes(f'text-{status_color}-500 font-bold')
+                                
+                                ui.label(f'Created: {exp.created_at.strftime("%Y-%m-%d %H:%M")}')
+                                
+                                # Count batches
+                                session = get_session()
+                                try:
+                                    batch_count = session.query(Batch).filter_by(experiment_id=exp.id).count()
+                                    ui.label(f'{batch_count} Batches')
+                                finally:
+                                    session.close()
+                                
+                                # eLabFTW status
+                                if exp.elab_id:
+                                    ui.label(f'Synced with eLabFTW (ID: {exp.elab_id})').classes('text-green-500')
+                                else:
+                                    ui.label('Not synced with eLabFTW').classes('text-gray-500')
+                                
+                                # Action buttons
+                                with ui.row().classes('w-full justify-end mt-2'):
+                                    ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
+                                    ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
+          # Set up event handlers for filter and sort changes
+        status_filter.on_value_change(lambda: apply_filters_and_sort())
+        sort_by.on_value_change(lambda: apply_filters_and_sort())
+        
+        # Initial application of filters
+        apply_filters_and_sort()
         
         ui.button('Create New Experiment', on_click=lambda: ui.run_javascript("window.location.href = '/new-experiment'")).classes('mt-4')
 
@@ -563,8 +597,7 @@ def create_experiment_edit_ui(experiment_id):
         ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mt-4')
         return
     
-    batches = get_experiment_batches(experiment_id)
-
+    batches = get_experiment_batches(experiment_id)    
     with ui.card().classes('w-full'):
         # Header with experiment title and status
         with ui.row().classes('w-full justify-between items-center'):
@@ -581,6 +614,13 @@ def create_experiment_edit_ui(experiment_id):
             status_color = status_colors.get(status, 'gray')
             ui.label(f'Status: {status}').classes(f'text-{status_color}-500 font-bold')
         
+        # eLabFTW sync status
+        with ui.row().classes('w-full mt-2'):
+            if experiment.elab_id:
+                ui.label(f'Synced with eLabFTW (ID: {experiment.elab_id})').classes('text-green-500')
+            else:
+                ui.label('Not synced with eLabFTW').classes('text-gray-500')
+         
         # Experiment notes
         notes_input = ui.textarea(
             label='Experiment Notes',
