@@ -841,9 +841,7 @@ def create_experiment_edit_ui(experiment_id):
                     ui.notify('Failed to save experiment', color='negative')
 
             ui.button('Save Experiment', on_click=save_experiment, color='green').classes('mr-2')
-            ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id), color='indigo').classes('mr-2')
-
-            # Workflow buttons
+            ui.button('Sync with eLabFTW', on_click=lambda: sync_experiment_with_elabftw(experiment_id), color='indigo').classes('mr-2')            # Workflow buttons
             ui.button(
                 'Workflow Tracking',
                 on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/workflow'"),
@@ -851,11 +849,17 @@ def create_experiment_edit_ui(experiment_id):
             ).classes('mr-2')
 
             ui.button(
+                'Measurements Overview',
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/overview'"),
+                color='amber'
+            ).classes('mr-2')
+
+            ui.button(
                 'Configure Timepoints',
                 on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'"),
                 color='pink'
             ).classes('mr-2')
-                   
+
 def open_batch_edit_dialog(batch_id):
     """
     Open a dialog to edit batch parameters

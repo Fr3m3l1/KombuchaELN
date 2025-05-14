@@ -457,6 +457,49 @@ async def mark_all_batches_completed(timepoint_id):
     finally:
         session.close()
 
+def get_experiment_measurements_matrix(experiment_id):
+    """
+    Get all measurements for an experiment organized as a matrix of timepoints and batches
+    
+    Args:
+        experiment_id: The ID of the experiment
+        
+    Returns:
+        A dictionary with timepoints as keys and dictionary of batch measurements as values
+    """
+    session = get_session()
+    try:
+        # Get timepoints for this experiment
+        timepoints = get_experiment_timepoints(experiment_id)
+        
+        # Get batches for this experiment
+        batches = session.query(Batch).filter_by(experiment_id=experiment_id).all()
+        
+        # Create measurements matrix
+        measurements_matrix = {}
+        
+        for timepoint in timepoints:
+            measurements_matrix[timepoint.id] = {
+                'timepoint': timepoint,
+                'batches': {}
+            }
+            
+            for batch in batches:
+                # Get measurement for this batch at this timepoint
+                measurement = session.query(Measurement).filter_by(
+                    batch_id=batch.id,
+                    timepoint_id=timepoint.id
+                ).first()
+                
+                measurements_matrix[timepoint.id]['batches'][batch.id] = {
+                    'batch': batch,
+                    'measurement': measurement
+                }
+        
+        return measurements_matrix
+    finally:
+        session.close()
+
 def create_timepoint_config_ui(experiment_id):
     """
     Create the UI for configuring timepoints
@@ -584,9 +627,15 @@ def create_timepoint_workflow_ui(experiment_id):
     
     # Get all batches
     batches = get_session().query(Batch).filter_by(experiment_id=experiment_id).all()
-    
     with ui.card().classes('w-full'):
-        ui.label('Workflow Tracking').classes('text-xl font-bold')
+        # Card header with title and measurements overview button
+        with ui.row().classes('w-full flex justify-between items-center'):
+            ui.label('Workflow Tracking').classes('text-xl font-bold')
+            ui.button(
+                'View Measurements Overview', 
+                on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/overview'"),
+                color='amber'
+            ).classes('ml-auto')
         
         # Timepoint navigation visualization (timeline)
         with ui.row().classes('w-full items-center mt-2'):
