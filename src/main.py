@@ -3,6 +3,7 @@ from src.database import setup_database, get_engine
 from src.auth import create_login_ui, create_register_ui, create_api_key_ui, login_required, get_current_user, logout
 from src.experiments import create_experiment_list_ui, create_new_experiment_ui, create_experiment_edit_ui, create_batch_detail_ui
 from src.timepoints import create_timepoint_workflow_ui, create_timepoint_config_ui
+from src.timepoints_overview import create_measurements_overview_ui
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
@@ -149,10 +150,21 @@ def experiment_timepoints_page(experiment_id: int):
 
         create_timepoint_config_ui(experiment_id)
 
+@ui.page('/experiment/{experiment_id}/overview')
+@login_required
+def experiment_overview_page(experiment_id: int):
+    with ui.column().classes('w-full max-w-6xl mx-auto p-4'):
+        with ui.row().classes('w-full justify-between items-center'):
+            ui.label('Kombucha ELN').classes('text-3xl')
+            ui.button('Back to Experiment', on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}'"), color='gray').classes('mr-2')
+
+        ui.separator()
+
+        create_measurements_overview_ui(experiment_id)
+
 # Add custom CSS
 @ui.page('/styles.css')
-def styles():
-    return """
+def styles():    return """
     body {
         font-family: 'Arial', sans-serif;
         background-color: #f5f5f5;
@@ -165,6 +177,43 @@ def styles():
 
     .nicegui-button {
         border-radius: 4px;
+    }    /* Mobile-specific styles */
+    @media (max-width: 640px) {
+        .nicegui-button {
+            width: 100%; /* Full width buttons on small screens */
+        }
+        
+        .ui-table {
+            overflow-x: auto; /* Allow tables to scroll horizontally on small screens */
+        }
+        
+        /* Ensure adequate touch target size */
+        button, 
+        [role="button"], 
+        input[type="button"], 
+        input[type="submit"], 
+        input[type="reset"] {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        /* Make inputs more touch-friendly */
+        input,
+        select,
+        textarea {
+            font-size: 16px !important; /* Prevent iOS zoom on focus */
+            padding: 10px !important;
+        }
+        
+        /* Better spacing for form elements on mobile */
+        .q-field {
+            margin-bottom: 16px !important;
+        }
+
+        /* Ensure dialogs don't exceed screen width */
+        .q-dialog__inner {
+            max-width: 90vw !important;
+        }
     }
     """
 
