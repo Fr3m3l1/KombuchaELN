@@ -3,6 +3,8 @@ from src.database import Experiment, Batch, get_session
 from src.auth import get_current_user, login_required
 from src.templates import generate_experiment_html, generate_batch_dict_from_db_batch
 from src.elab_api import create_and_update_experiment, initialize_api_client
+from src.timepoints import get_experiment_timepoints
+from elabapi_python.rest import ApiException
 import datetime
 
 # Function to delete an experiment
@@ -432,8 +434,6 @@ async def sync_experiment_with_elabftw(experiment_id):
     Returns:
         True if sync was successful, False otherwise
     """
-    from src.timepoints import get_experiment_timepoints
-    from src.templates import generate_batch_dict_from_db_batch
 
     current_user = get_current_user()
     if current_user is None or not current_user.elab_api_key:
@@ -468,42 +468,141 @@ async def sync_experiment_with_elabftw(experiment_id):
         _, exp_client, _, _ = clients
 
         if experiment.elab_id:
-            # Update existing experiment
-            update_payload = {
-                'title': experiment.title,
-                'body': html_content,
-            }
-            exp_client.patch_experiment_with_http_info(
-                id=experiment.elab_id,
-                body=update_payload,
-                async_req=False
-            )
-            ui.notify(f"Experiment updated in eLabFTW (ID: {experiment.elab_id})", color='positive')
+            try:
+                # Update existing experiment
+                update_payload = {
+                    'title': experiment.title,
+                    'body': html_content,
+                }
+                exp_client.patch_experiment_with_http_info(
+                    id=experiment.elab_id,
+                    body=update_payload,
+                    async_req=False
+                )
+                ui.notify(f"Experiment updated in eLabFTW (ID: {experiment.elab_id})", color='positive')
+            except ApiException as api_error:
+                if api_error.status == 403:
+                    # Handle 403 Forbidden error (experiment deleted or access lost)
+                    # Store experiment_id before resetting elab_id
+                    experiment_id_for_dialog = experiment.id
+                    
+                    with ui.dialog() as dialog, ui.card():
+                        ui.label("eLabFTW Access Error").classes('text-xl font-bold text-red-500')
+                        ui.label("The experiment cannot be accessed in eLabFTW. It may have been deleted or your access has been revoked.").classes('my-2')
+                        ui.label("Would you like to create a new experiment in eLabFTW?").classes('font-bold my-2')
+                        
+                        async def confirm_create_new():
+                            dialog.close()
+                            experiment.elab_id = None
+                            # Reset the elab_id
+                            session.commit()
+                            # Create a fresh session and get the experiment again
+                            await recreate_sync_experiment(experiment_id_for_dialog)
+                        
+                        async def cancel_action():
+                            dialog.close()
+                            ui.notify("Sync canceled", color='warning')
+                        
+                        with ui.row().classes('w-full justify-end'):
+                            ui.button('No', on_click=cancel_action).classes('mr-2')
+                            ui.button('Yes, Create New', on_click=confirm_create_new, color='primary')
+                        
+                        dialog.open()
+                    return False
+                else:
+                    raise  # Re-raise other API exceptions
         else:
-            # Create a new experiment
-            elab_experiment = create_and_update_experiment(
-                api_key=current_user.elab_api_key,
-                title=experiment.title,
-                body=html_content,
-                tags=["KombuchaELN", "API"]
-            )
-            if elab_experiment:
-                experiment.elab_id = elab_experiment.id
-                session.commit()
-                # Reload the page to show updated sync status
-                ui.run_javascript("window.location.reload()")
-                ui.notify(f"Experiment synced with eLabFTW (ID: {elab_experiment.id})", color='positive')
-            else:
-                ui.notify("Failed to sync with eLabFTW", color='negative')
-                return False
+            # Creating new experiment - no existing elab_id
+            return await create_new_elab_experiment(experiment, html_content, session)
         
         return True
+    except ApiException as api_error:
+        session.rollback()
+        if api_error.status == 403:
+            ui.notify("Access to experiment in eLabFTW denied. The experiment may have been deleted or your access revoked.", color='negative')
+        else:
+            ui.notify(f"API Error syncing with eLabFTW: {api_error.status} {api_error.reason}", color='negative')
+        return False
     except Exception as e:
         session.rollback()
         ui.notify(f"Error syncing with eLabFTW: {str(e)}", color='negative')
         return False
     finally:
         session.close()
+        
+async def create_new_elab_experiment(experiment, html_content, session):
+    """
+    Create a new experiment in eLabFTW and update the local experiment record.
+    
+    Args:
+        experiment: The local experiment object
+        html_content: The HTML content for the eLabFTW experiment
+        session: The database session
+        
+    Returns:
+        True if creation was successful, False otherwise
+    """
+    current_user = get_current_user()
+    # Create a new experiment
+    elab_experiment = create_and_update_experiment(
+        api_key=current_user.elab_api_key,
+        title=experiment.title,
+        body=html_content,
+        tags=["KombuchaELN", "API"]
+    )
+    if elab_experiment:
+        experiment.elab_id = elab_experiment.id
+        session.commit()
+        # Reload the page to show updated sync status
+        ui.run_javascript("window.location.reload()")
+        ui.notify(f"Experiment synced with eLabFTW (ID: {elab_experiment.id})", color='positive')
+        return True
+    else:
+        ui.notify("Failed to sync with eLabFTW", color='negative')
+        return False
+
+async def recreate_sync_experiment(experiment_id):
+    """
+    Re-create an experiment in eLabFTW after access was denied to the previous one.
+    Creates a fresh session and generates new content to sync.
+    
+    Args:
+        experiment_id: The ID of the experiment to sync
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    # Create a new session and restart the sync process
+    
+    new_session = get_session()
+    try:
+        # Get the experiment with the fresh session
+        experiment = new_session.query(Experiment).filter_by(id=experiment_id).first()
+        if not experiment:
+            ui.notify("Could not find experiment", color='negative')
+            return False
+            
+        # Get batches and timepoints
+        batches = new_session.query(Batch).filter_by(experiment_id=experiment_id).all()
+        timepoints = get_experiment_timepoints(experiment_id)
+        
+        # Generate HTML content
+        batch_dicts = []
+        for batch in batches:
+            batch_dict = generate_batch_dict_from_db_batch(batch, timepoints=timepoints)
+            batch_dicts.append(batch_dict)
+        
+        html_content = generate_experiment_html(experiment.title, batch_dicts)
+        
+        # Create the experiment in eLabFTW
+        result = await create_new_elab_experiment(experiment, html_content, new_session)
+        return result
+    except Exception as e:
+        new_session.rollback()
+        ui.notify(f"Error recreating experiment in eLabFTW: {str(e)}", color='negative')
+        return False
+    finally:
+        new_session.close()
 
 def create_experiment_list_ui():
     """Create the UI for listing experiments"""
