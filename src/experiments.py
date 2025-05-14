@@ -855,9 +855,7 @@ def create_experiment_edit_ui(experiment_id):
                 on_click=lambda: ui.run_javascript(f"window.location.href = '/experiment/{experiment_id}/timepoints'"),
                 color='pink'
             ).classes('mr-2')
-
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
-       
+                   
 def open_batch_edit_dialog(batch_id):
     """
     Open a dialog to edit batch parameters
