@@ -4,7 +4,7 @@ Functions for displaying the timepoint measurements overview
 
 from nicegui import ui
 from src.database import Experiment, Batch, Timepoint, Measurement, get_session
-from src.timepoints import get_experiment_timepoints, get_batch_measurement, record_measurement, mark_measurement_completed
+from src.timepoints import get_experiment_timepoints, get_batch_measurement, record_measurement, mark_measurement_completed, is_final_timepoint
 import datetime
 
 def get_experiment_measurements_matrix(experiment_id):
@@ -304,6 +304,109 @@ def create_measurements_overview_ui(experiment_id):
                                     value=completed, 
                                     on_change=lambda e, b=b_id, t=t_id: toggle_completed(e, b, t)
                                    ).classes('ml-4')
+        
+        # SCOBY Weights section (only shown for final timepoints)
+        # Check if any timepoint is a final timepoint
+        has_final_timepoint = any(is_final_timepoint(tp.id) for tp in timepoints)
+        
+        if has_final_timepoint:
+            ui.label('SCOBY Weights').classes('text-lg font-bold mt-6')
+            
+            # Create a grid for SCOBY weights
+            with ui.element('div').classes('w-full overflow-x-auto mt-2'):
+                with ui.grid(columns=len(timepoints) + 1).classes('w-full'):
+                    # Header row
+                    ui.label('Batch/Timepoint').classes('font-bold')
+                    for timepoint in timepoints:
+                        is_final = is_final_timepoint(timepoint.id)
+                        label_text = f"{timepoint.name} ({timepoint.hours}h)"
+                        if is_final:
+                            label_text += " (Final)"
+                        ui.label(label_text).classes('font-bold')
+                    
+                    # Data rows
+                    for batch in batches:
+                        ui.label(batch.name).classes('font-bold')
+                        
+                        for timepoint in timepoints:
+                            measurement = get_batch_measurement(batch.id, timepoint.id)
+                            is_final = is_final_timepoint(timepoint.id)
+                            
+                            # Capture batch_id and timepoint_id for lambda functions
+                            b_id = batch.id
+                            t_id = timepoint.id
+                            
+                            with ui.card().classes('p-2 m-1'):
+                                if is_final:
+                                    # Get current SCOBY weight values
+                                    wet_weight = measurement.scoby_wet_weight if measurement and measurement.scoby_wet_weight is not None else None
+                                    dry_weight = measurement.scoby_dry_weight if measurement and measurement.scoby_dry_weight is not None else None
+                                    
+                                    # Function to open a dialog for editing SCOBY weights
+                                    async def open_scoby_dialog(b_id, t_id):
+                                        # Get current values
+                                        m = get_batch_measurement(b_id, t_id)
+                                        current_wet = m.scoby_wet_weight if m and m.scoby_wet_weight is not None else None
+                                        current_dry = m.scoby_dry_weight if m and m.scoby_dry_weight is not None else None
+                                        
+                                        session = get_session()
+                                        batch_obj = session.query(Batch).filter_by(id=b_id).first()
+                                        tp_obj = session.query(Timepoint).filter_by(id=t_id).first()
+                                        batch_name = batch_obj.name if batch_obj else "Unknown"
+                                        tp_name = tp_obj.name if tp_obj else "Unknown"
+                                        session.close()
+                                        
+                                        with ui.dialog() as dialog, ui.card():
+                                            ui.label(f'Edit SCOBY Weights - {batch_name} at {tp_name}').classes('text-lg font-bold')
+                                            
+                                            wet_input = ui.number('Wet Weight (g)', 
+                                                                value=current_wet,
+                                                                min=0, step=0.1
+                                                            ).classes('w-full')
+                                            
+                                            dry_input = ui.number('Dry Weight (g)', 
+                                                                value=current_dry,
+                                                                min=0, step=0.1
+                                                            ).classes('w-full')
+                                            
+                                            async def save_scoby():
+                                                success = await record_measurement(
+                                                    b_id, 
+                                                    t_id, 
+                                                    scoby_wet_weight=wet_input.value,
+                                                    scoby_dry_weight=dry_input.value
+                                                )
+                                                
+                                                if success:
+                                                    ui.notify('SCOBY weights updated', color='positive')
+                                                    dialog.close()
+                                                    ui.run_javascript("window.location.reload()")
+                                                else:
+                                                    ui.notify('Failed to update SCOBY weights', color='negative')
+                                            
+                                            with ui.row().classes('w-full justify-end gap-2'):
+                                                ui.button('Cancel', on_click=dialog.close)
+                                                ui.button('Save', on_click=save_scoby, color='green')
+                                            
+                                        dialog.open()
+                                    
+                                    # Display SCOBY weights if available, otherwise show a button to add them
+                                    if wet_weight is not None or dry_weight is not None:
+                                        with ui.element('div').classes('flex flex-col items-center'):
+                                            if wet_weight is not None:
+                                                ui.label(f'Wet: {wet_weight}g').classes('text-sm')
+                                            if dry_weight is not None:
+                                                ui.label(f'Dry: {dry_weight}g').classes('text-sm')
+                                            ui.button('Edit', 
+                                                    on_click=lambda _, b=b_id, t=t_id: open_scoby_dialog(b, t),
+                                                    color='green').props('dense size="sm"')
+                                    else:
+                                        ui.button('Add Weights', 
+                                                on_click=lambda _, b=b_id, t=t_id: open_scoby_dialog(b, t),
+                                                color='blue').props('dense')
+                                else:
+                                    # Display N/A for non-final timepoints
+                                    ui.label('N/A').classes('text-center text-gray-500')
         
         # Navigation buttons
         with ui.row().classes('w-full justify-between mt-8'):
