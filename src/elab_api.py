@@ -65,7 +65,7 @@ def initialize_api_client(api_key=None):
         logger.error(f"Unexpected error: {str(e)}")
         return None
 
-def create_and_update_experiment(api_key, title, body, category_id=1, status_id=1, tags=None, content_type=1):
+def create_and_update_experiment(api_key, title, body, category_id=None, status_id=1, tags=None, content_type=1):
     """
     Creates a new experiment in elabFTW
     
