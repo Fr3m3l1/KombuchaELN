@@ -3,7 +3,50 @@ from src.database import Experiment, Batch, get_session
 from src.auth import get_current_user, login_required
 from src.templates import generate_experiment_html, generate_batch_dict_from_db_batch
 from src.elab_api import create_and_update_experiment, initialize_api_client
+from src.timepoints import get_experiment_timepoints
+from elabapi_python.rest import ApiException
 import datetime
+
+# Function to delete an experiment
+async def delete_experiment(experiment_id):
+    session = get_session()
+    try:
+        experiment = session.query(Experiment).filter_by(id=experiment_id).first()
+        if not experiment:
+            ui.notify('Experiment not found', color='negative')
+            return False
+
+        # Delete all batches associated with this experiment
+        session.query(Batch).filter_by(experiment_id=experiment_id).delete()
+        
+        # Delete the experiment
+        session.delete(experiment)
+        session.commit()
+
+        ui.notify('Experiment deleted successfully', color='positive')
+        ui.run_javascript("window.location.href = '/'")
+        return True
+    except Exception as e:
+        session.rollback()
+        ui.notify(f"Error deleting experiment: {str(e)}", color='negative')
+        return False
+    finally:
+        session.close()
+
+def open_experiment_delete_dialog(experiment_id, experiment_title):
+    with ui.dialog() as dialog, ui.card():
+        ui.label(f"Are you sure you want to delete experiment '{experiment_title}'?").classes("text-lg")
+        ui.label("This will delete all batches and associated data. This action cannot be undone.").classes("text-red-500")
+
+        async def confirm_delete():
+            success = await delete_experiment(experiment_id)
+            dialog.close()
+
+        with ui.row().classes("justify-end w-full mt-4"):
+            ui.button('Cancel', on_click=dialog.close).classes('mr-2')
+            ui.button('Delete', color='red', on_click=confirm_delete)
+
+        dialog.open()
 
 # New function to duplicate a batch
 async def duplicate_batch(batch_id):
@@ -391,8 +434,6 @@ async def sync_experiment_with_elabftw(experiment_id):
     Returns:
         True if sync was successful, False otherwise
     """
-    from src.timepoints import get_experiment_timepoints
-    from src.templates import generate_batch_dict_from_db_batch
 
     current_user = get_current_user()
     if current_user is None or not current_user.elab_api_key:
@@ -427,53 +468,154 @@ async def sync_experiment_with_elabftw(experiment_id):
         _, exp_client, _, _ = clients
 
         if experiment.elab_id:
-            # Update existing experiment
-            update_payload = {
-                'title': experiment.title,
-                'body': html_content,
-            }
-            exp_client.patch_experiment_with_http_info(
-                id=experiment.elab_id,
-                body=update_payload,
-                async_req=False
-            )
-            ui.notify(f"Experiment updated in eLabFTW (ID: {experiment.elab_id})", color='positive')
+            try:
+                # Update existing experiment
+                update_payload = {
+                    'title': experiment.title,
+                    'body': html_content,
+                }
+                exp_client.patch_experiment_with_http_info(
+                    id=experiment.elab_id,
+                    body=update_payload,
+                    async_req=False
+                )
+                ui.notify(f"Experiment updated in eLabFTW (ID: {experiment.elab_id})", color='positive')
+            except ApiException as api_error:
+                if api_error.status == 403:
+                    # Handle 403 Forbidden error (experiment deleted or access lost)
+                    # Store experiment_id before resetting elab_id
+                    experiment_id_for_dialog = experiment.id
+                    
+                    with ui.dialog() as dialog, ui.card():
+                        ui.label("eLabFTW Access Error").classes('text-xl font-bold text-red-500')
+                        ui.label("The experiment cannot be accessed in eLabFTW. It may have been deleted or your access has been revoked.").classes('my-2')
+                        ui.label("Would you like to create a new experiment in eLabFTW?").classes('font-bold my-2')
+                        
+                        async def confirm_create_new():
+                            dialog.close()
+                            experiment.elab_id = None
+                            # Reset the elab_id
+                            session.commit()
+                            # Create a fresh session and get the experiment again
+                            await recreate_sync_experiment(experiment_id_for_dialog)
+                        
+                        async def cancel_action():
+                            dialog.close()
+                            ui.notify("Sync canceled", color='warning')
+                        
+                        with ui.row().classes('w-full justify-end'):
+                            ui.button('No', on_click=cancel_action).classes('mr-2')
+                            ui.button('Yes, Create New', on_click=confirm_create_new, color='primary')
+                        
+                        dialog.open()
+                    return False
+                else:
+                    raise  # Re-raise other API exceptions
         else:
-            # Create a new experiment
-            elab_experiment = create_and_update_experiment(
-                api_key=current_user.elab_api_key,
-                title=experiment.title,
-                body=html_content,
-                tags=["KombuchaELN", "API"]
-            )
-            if elab_experiment:
-                experiment.elab_id = elab_experiment.id
-                session.commit()
-                ui.notify(f"Experiment synced with eLabFTW (ID: {elab_experiment.id})", color='positive')
-            else:
-                ui.notify("Failed to sync with eLabFTW", color='negative')
-                return False
-
+            # Creating new experiment - no existing elab_id
+            return await create_new_elab_experiment(experiment, html_content, session)
+        
         return True
+    except ApiException as api_error:
+        session.rollback()
+        if api_error.status == 403:
+            ui.notify("Access to experiment in eLabFTW denied. The experiment may have been deleted or your access revoked.", color='negative')
+        else:
+            ui.notify(f"API Error syncing with eLabFTW: {api_error.status} {api_error.reason}", color='negative')
+        return False
     except Exception as e:
         session.rollback()
         ui.notify(f"Error syncing with eLabFTW: {str(e)}", color='negative')
         return False
     finally:
         session.close()
+        
+async def create_new_elab_experiment(experiment, html_content, session):
+    """
+    Create a new experiment in eLabFTW and update the local experiment record.
+    
+    Args:
+        experiment: The local experiment object
+        html_content: The HTML content for the eLabFTW experiment
+        session: The database session
+        
+    Returns:
+        True if creation was successful, False otherwise
+    """
+    current_user = get_current_user()
+    # Create a new experiment
+    elab_experiment = create_and_update_experiment(
+        api_key=current_user.elab_api_key,
+        title=experiment.title,
+        body=html_content,
+        tags=["KombuchaELN", "API"]
+    )
+    if elab_experiment:
+        experiment.elab_id = elab_experiment.id
+        session.commit()
+        # Reload the page to show updated sync status
+        ui.run_javascript("window.location.reload()")
+        ui.notify(f"Experiment synced with eLabFTW (ID: {elab_experiment.id})", color='positive')
+        return True
+    else:
+        ui.notify("Failed to sync with eLabFTW", color='negative')
+        return False
+
+async def recreate_sync_experiment(experiment_id):
+    """
+    Re-create an experiment in eLabFTW after access was denied to the previous one.
+    Creates a fresh session and generates new content to sync.
+    
+    Args:
+        experiment_id: The ID of the experiment to sync
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    # Create a new session and restart the sync process
+    
+    new_session = get_session()
+    try:
+        # Get the experiment with the fresh session
+        experiment = new_session.query(Experiment).filter_by(id=experiment_id).first()
+        if not experiment:
+            ui.notify("Could not find experiment", color='negative')
+            return False
+            
+        # Get batches and timepoints
+        batches = new_session.query(Batch).filter_by(experiment_id=experiment_id).all()
+        timepoints = get_experiment_timepoints(experiment_id)
+        
+        # Generate HTML content
+        batch_dicts = []
+        for batch in batches:
+            batch_dict = generate_batch_dict_from_db_batch(batch, timepoints=timepoints)
+            batch_dicts.append(batch_dict)
+        
+        html_content = generate_experiment_html(experiment.title, batch_dicts)
+        
+        # Create the experiment in eLabFTW
+        result = await create_new_elab_experiment(experiment, html_content, new_session)
+        return result
+    except Exception as e:
+        new_session.rollback()
+        ui.notify(f"Error recreating experiment in eLabFTW: {str(e)}", color='negative')
+        return False
+    finally:
+        new_session.close()
 
 def create_experiment_list_ui():
     """Create the UI for listing experiments"""
     with ui.card().classes('w-full'):
         ui.label('My Experiments').classes('text-2xl')
-        
+
         # Add filter/sort controls
         with ui.row().classes('w-full items-center mb-4'):
             status_filter = ui.select(
                 ['All', 'Planning', 'Running', 'Analysis', 'Completed'],
                 value='All',
                 label='Filter by Status'
-            ).classes('mr-4')
+            ).classes('mr-4 min-w-32')
             
             sort_by = ui.select(
                 ['Newest First', 'Oldest First', 'Title A-Z', 'Title Z-A'],
@@ -481,49 +623,81 @@ def create_experiment_list_ui():
                 label='Sort by'
             )
         
-        experiments = get_user_experiments()
+        # Get all experiments first
+        all_experiments = get_user_experiments()
         
-        if not experiments:
-            ui.label('No experiments found').classes('text-gray-500')
-        else:
-            # Create a card-based layout instead of a simple grid
-            with ui.grid(columns=3).classes('w-full gap-4'):
-                for exp in experiments:
-                    with ui.card().classes('w-full'):
-                        # Status indicator
-                        status = getattr(exp, 'status', 'Planning')
-                        status_colors = {
-                            'Planning': 'blue',
-                            'Running': 'orange',
-                            'Analysis': 'purple',
-                            'Completed': 'green'
-                        }
-                        status_color = status_colors.get(status, 'gray')
-                        
-                        with ui.row().classes('w-full justify-between items-center'):
-                            ui.label(exp.title).classes('text-xl font-bold')
-                            ui.label(status).classes(f'text-{status_color}-500 font-bold')
-                        
-                        ui.label(f'Created: {exp.created_at.strftime("%Y-%m-%d %H:%M")}')
-                        
-                        # Count batches
-                        session = get_session()
-                        try:
-                            batch_count = session.query(Batch).filter_by(experiment_id=exp.id).count()
-                            ui.label(f'{batch_count} Batches')
-                        finally:
-                            session.close()
-                        
-                        # eLabFTW status
-                        if exp.elab_id:
-                            ui.label(f'Synced with eLabFTW (ID: {exp.elab_id})').classes('text-green-500')
-                        else:
-                            ui.label('Not synced with eLabFTW').classes('text-gray-500')
-                        
-                        # Action buttons
-                        with ui.row().classes('w-full justify-end mt-2'):
-                            ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
-                            ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
+        # Grid container that will be refreshed when filters change
+        experiment_grid_container = ui.element('div').classes('w-full')
+        
+        def apply_filters_and_sort():
+            """Apply filters and sort to the experiment list"""
+            # Clear the container
+            experiment_grid_container.clear()
+            
+            # Filter experiments
+            filtered_experiments = all_experiments
+            if status_filter.value != 'All':
+                filtered_experiments = [exp for exp in filtered_experiments if getattr(exp, 'status', 'Planning') == status_filter.value]
+            
+            # Sort experiments
+            if sort_by.value == 'Newest First':
+                filtered_experiments.sort(key=lambda x: x.created_at, reverse=True)
+            elif sort_by.value == 'Oldest First':
+                filtered_experiments.sort(key=lambda x: x.created_at)
+            elif sort_by.value == 'Title A-Z':
+                filtered_experiments.sort(key=lambda x: x.title.lower())
+            elif sort_by.value == 'Title Z-A':
+                filtered_experiments.sort(key=lambda x: x.title.lower(), reverse=True)
+            
+            # Display filtered and sorted experiments
+            with experiment_grid_container:
+                if not filtered_experiments:
+                    ui.label('No experiments found matching filters').classes('text-gray-500')
+                else:
+                    # Create a card-based layout
+                    with ui.grid(columns=3).classes('w-full gap-4'):
+                        for exp in filtered_experiments:
+                            with ui.card().classes('w-full'):
+                                # Status indicator
+                                status = getattr(exp, 'status', 'Planning')
+                                status_colors = {
+                                    'Planning': 'blue',
+                                    'Running': 'orange',
+                                    'Analysis': 'purple',
+                                    'Completed': 'green'
+                                }
+                                status_color = status_colors.get(status, 'gray')
+                                
+                                with ui.row().classes('w-full justify-between items-center'):
+                                    ui.label(exp.title).classes('text-xl font-bold')
+                                    ui.label(status).classes(f'text-{status_color}-500 font-bold')
+                                
+                                ui.label(f'Created: {exp.created_at.strftime("%Y-%m-%d %H:%M")}')
+                                
+                                # Count batches
+                                session = get_session()
+                                try:
+                                    batch_count = session.query(Batch).filter_by(experiment_id=exp.id).count()
+                                    ui.label(f'{batch_count} Batches')
+                                finally:
+                                    session.close()
+                                
+                                # eLabFTW status
+                                if exp.elab_id:
+                                    ui.label(f'Synced with eLabFTW (ID: {exp.elab_id})').classes('text-green-500')
+                                else:
+                                    ui.label('Not synced with eLabFTW').classes('text-gray-500')
+                                  # Action buttons
+                                with ui.row().classes('w-full justify-end mt-2'):
+                                    ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
+                                    ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
+                                    ui.button('Delete', on_click=lambda e=exp.id, t=exp.title: open_experiment_delete_dialog(e, t), color='red')
+          # Set up event handlers for filter and sort changes
+        status_filter.on_value_change(lambda: apply_filters_and_sort())
+        sort_by.on_value_change(lambda: apply_filters_and_sort())
+        
+        # Initial application of filters
+        apply_filters_and_sort()
         
         ui.button('Create New Experiment', on_click=lambda: ui.run_javascript("window.location.href = '/new-experiment'")).classes('mt-4')
 
@@ -563,8 +737,7 @@ def create_experiment_edit_ui(experiment_id):
         ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'")).classes('mt-4')
         return
     
-    batches = get_experiment_batches(experiment_id)
-
+    batches = get_experiment_batches(experiment_id)    
     with ui.card().classes('w-full'):
         # Header with experiment title and status
         with ui.row().classes('w-full justify-between items-center'):
@@ -581,6 +754,13 @@ def create_experiment_edit_ui(experiment_id):
             status_color = status_colors.get(status, 'gray')
             ui.label(f'Status: {status}').classes(f'text-{status_color}-500 font-bold')
         
+        # eLabFTW sync status
+        with ui.row().classes('w-full mt-2'):
+            if experiment.elab_id:
+                ui.label(f'Synced with eLabFTW (ID: {experiment.elab_id})').classes('text-green-500')
+            else:
+                ui.label('Not synced with eLabFTW').classes('text-gray-500')
+         
         # Experiment notes
         notes_input = ui.textarea(
             label='Experiment Notes',
@@ -669,6 +849,7 @@ def create_experiment_edit_ui(experiment_id):
             ).classes('mr-2')
 
             ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+            ui.button('Delete Experiment', on_click=lambda: open_experiment_delete_dialog(experiment_id, experiment.title), color='red')
        
 def open_batch_edit_dialog(batch_id):
     """
