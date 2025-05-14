@@ -771,13 +771,21 @@ def create_experiment_edit_ui(experiment_id):
         ui.separator()
         
         # Batches section
-        ui.label('Batches').classes('text-xl mt-4')
-        
-        # Grid layout for batch cards - changed to 1 column
+        ui.label('Batches').classes('text-xl mt-4')        # Grid layout for batch cards - changed to 1 column
         with ui.grid(columns=1).classes('w-full gap-4 mt-2'):
             for batch in batches:
+                # Check if batch has any parameters set
+                has_parameters = (batch.tea_type or 
+                                batch.tea_concentration is not None or 
+                                batch.water_amount is not None or 
+                                batch.sugar_type or 
+                                batch.sugar_concentration is not None or 
+                                batch.inoculum_concentration is not None or 
+                                batch.temperature is not None)
+                
                 with ui.card().classes('w-full'):
-                    with ui.expansion(batch.name, icon='science').classes('w-full'):
+                    # Open by default if no parameters are set
+                    with ui.expansion(batch.name, icon='science', value=not has_parameters).classes('w-full'):
                         # Batch header with name and status (name is now in expansion header)
                         # Full parameter listing
                         with ui.column().classes('text-sm text-gray-700 mt-2'):
@@ -848,7 +856,6 @@ def create_experiment_edit_ui(experiment_id):
                 color='pink'
             ).classes('mr-2')
 
-            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
             ui.button('Delete Experiment', on_click=lambda: open_experiment_delete_dialog(experiment_id, experiment.title), color='red')
        
 def open_batch_edit_dialog(batch_id):
