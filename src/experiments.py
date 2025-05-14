@@ -5,6 +5,47 @@ from src.templates import generate_experiment_html, generate_batch_dict_from_db_
 from src.elab_api import create_and_update_experiment, initialize_api_client
 import datetime
 
+# Function to delete an experiment
+async def delete_experiment(experiment_id):
+    session = get_session()
+    try:
+        experiment = session.query(Experiment).filter_by(id=experiment_id).first()
+        if not experiment:
+            ui.notify('Experiment not found', color='negative')
+            return False
+
+        # Delete all batches associated with this experiment
+        session.query(Batch).filter_by(experiment_id=experiment_id).delete()
+        
+        # Delete the experiment
+        session.delete(experiment)
+        session.commit()
+
+        ui.notify('Experiment deleted successfully', color='positive')
+        ui.run_javascript("window.location.href = '/'")
+        return True
+    except Exception as e:
+        session.rollback()
+        ui.notify(f"Error deleting experiment: {str(e)}", color='negative')
+        return False
+    finally:
+        session.close()
+
+def open_experiment_delete_dialog(experiment_id, experiment_title):
+    with ui.dialog() as dialog, ui.card():
+        ui.label(f"Are you sure you want to delete experiment '{experiment_title}'?").classes("text-lg")
+        ui.label("This will delete all batches and associated data. This action cannot be undone.").classes("text-red-500")
+
+        async def confirm_delete():
+            success = await delete_experiment(experiment_id)
+            dialog.close()
+
+        with ui.row().classes("justify-end w-full mt-4"):
+            ui.button('Cancel', on_click=dialog.close).classes('mr-2')
+            ui.button('Delete', color='red', on_click=confirm_delete)
+
+        dialog.open()
+
 # New function to duplicate a batch
 async def duplicate_batch(batch_id):
     session = get_session()
@@ -547,11 +588,11 @@ def create_experiment_list_ui():
                                     ui.label(f'Synced with eLabFTW (ID: {exp.elab_id})').classes('text-green-500')
                                 else:
                                     ui.label('Not synced with eLabFTW').classes('text-gray-500')
-                                
-                                # Action buttons
+                                  # Action buttons
                                 with ui.row().classes('w-full justify-end mt-2'):
                                     ui.button('View/Edit', on_click=lambda e=exp.id: ui.run_javascript(f"window.location.href = '/experiment/{e}'")).classes('mr-2')
                                     ui.button('Sync', on_click=lambda e=exp.id: sync_experiment_with_elabftw(e), color='indigo').classes('mr-2')
+                                    ui.button('Delete', on_click=lambda e=exp.id, t=exp.title: open_experiment_delete_dialog(e, t), color='red')
           # Set up event handlers for filter and sort changes
         status_filter.on_value_change(lambda: apply_filters_and_sort())
         sort_by.on_value_change(lambda: apply_filters_and_sort())
@@ -709,6 +750,7 @@ def create_experiment_edit_ui(experiment_id):
             ).classes('mr-2')
 
             ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
+            ui.button('Delete Experiment', on_click=lambda: open_experiment_delete_dialog(experiment_id, experiment.title), color='red')
        
 def open_batch_edit_dialog(batch_id):
     """
