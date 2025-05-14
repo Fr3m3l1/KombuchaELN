@@ -831,15 +831,19 @@ def create_timepoint_workflow_ui(experiment_id):
                             # Test result buttons
                             ui.label('Record Test Results:').classes('text-center mt-2')
                             
-                            with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2'):
-                                # pH Button
+                            with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2'):                                # pH Button
                                 async def record_ph(b_id=batch.id, t_id=current_timepoint.id):
-
+                                    # Get correct batch name from ID
+                                    session = get_session()
+                                    batch_obj = session.query(Batch).filter_by(id=b_id).first()
+                                    batch_name = batch_obj.name if batch_obj else "Unknown Batch"
+                                    session.close()
+                                    
                                     # Declare the dialog in outer scope to close it later
                                     ph_dialog = ui.dialog()
 
                                     with ph_dialog, ui.card():
-                                        ui.label(f'Record pH for {batch.name}').classes('text-lg font-bold')
+                                        ui.label(f'Record pH for {batch_name}').classes('text-lg font-bold')
                                         
                                         # Free-text input for precise validation
                                         ph_input = ui.input('pH Value (0-14)').classes('w-full')
@@ -880,9 +884,15 @@ def create_timepoint_workflow_ui(experiment_id):
                                 
                                 # Micro Button
                                 async def record_micro(b_id=batch.id, t_id=current_timepoint.id):
+                                    # Get correct batch name from ID
+                                    session = get_session()
+                                    batch_obj = session.query(Batch).filter_by(id=b_id).first()
+                                    batch_name = batch_obj.name if batch_obj else "Unknown Batch"
+                                    session.close()
+                                    
                                     # Open a simple dialog to enter micro results
                                     with ui.dialog() as micro_dialog, ui.card():
-                                        ui.label(f'Record Microbiology for {batch.name}').classes('text-lg font-bold')
+                                        ui.label(f'Record Microbiology for {batch_name}').classes('text-lg font-bold')
                                         micro_results = ui.textarea(
                                             'Microbiology Results',
                                             placeholder='Enter CFU counts and any observations here...'
@@ -917,9 +927,15 @@ def create_timepoint_workflow_ui(experiment_id):
                                 
                                 # HPLC Button
                                 async def record_hplc(b_id=batch.id, t_id=current_timepoint.id):
+                                    # Get correct batch name from ID
+                                    session = get_session()
+                                    batch_obj = session.query(Batch).filter_by(id=b_id).first()
+                                    batch_name = batch_obj.name if batch_obj else "Unknown Batch"
+                                    session.close()
+                                    
                                     # Open a simple dialog to enter HPLC results
                                     with ui.dialog() as hplc_dialog, ui.card():
-                                        ui.label(f'Record HPLC for {batch.name}').classes('text-lg font-bold')
+                                        ui.label(f'Record HPLC for {batch_name}').classes('text-lg font-bold')
                                         hplc_results = ui.textarea(
                                             'HPLC Results',
                                             placeholder='Enter HPLC results and any observations here...'
@@ -956,11 +972,16 @@ def create_timepoint_workflow_ui(experiment_id):
                             if is_final_timepoint(current_timepoint.id):
                                 ui.separator().classes('my-2')
                                 ui.label('SCOBY Weights:').classes('text-center mt-2')
-                                
                                 async def record_scoby(b_id=batch.id, t_id=current_timepoint.id):
+                                    # Get correct batch name from ID
+                                    session = get_session()
+                                    batch_obj = session.query(Batch).filter_by(id=b_id).first()
+                                    batch_name = batch_obj.name if batch_obj else "Unknown Batch"
+                                    session.close()
+                                    
                                     # Open a simple dialog to enter SCOBY weights
                                     with ui.dialog() as scoby_dialog, ui.card():
-                                        ui.label(f'Record SCOBY Weights for {batch.name}').classes('text-lg font-bold')
+                                        ui.label(f'Record SCOBY Weights for {batch_name}').classes('text-lg font-bold')
                                         scoby_wet_weight = ui.number('Wet Weight (g)', min=0, step=0.1).classes('w-full')
                                         scoby_dry_weight = ui.number('Dry Weight (g)', min=0, step=0.1).classes('w-full')
                                         
@@ -1019,7 +1040,7 @@ def create_timepoint_workflow_ui(experiment_id):
                                 on_click=lambda b=batch.id, t=current_timepoint.id: open_measurement_dialog(b, t)
                             ).classes('bg-gray-500 text-white w-full mt-2')              # Complete All button
             
-            
+
             all_completed = is_timepoint_completed(current_timepoint.id)
             
             if not all_completed:
