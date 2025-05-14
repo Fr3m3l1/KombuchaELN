@@ -786,14 +786,11 @@ def create_timepoint_workflow_ui(experiment_id):
                                     # Declare the dialog in outer scope to close it later
                                     ph_dialog = ui.dialog()
 
-                                    # get measurement to preserve other values
-                                    measurement = get_batch_measurement(b_id, t_id)
-
                                     with ph_dialog, ui.card():
                                         ui.label(f'Record pH for {batch.name}').classes('text-lg font-bold')
                                         
                                         # Free-text input for precise validation
-                                        ph_input = ui.input('pH Value (0-14)', value=measurement.ph_value).classes('w-full')
+                                        ph_input = ui.input('pH Value (0-14)').classes('w-full')
                                         error_label = ui.label('').classes('text-red-500 text-sm')
 
                                         async def save_ph():
@@ -832,16 +829,11 @@ def create_timepoint_workflow_ui(experiment_id):
                                 # Micro Button
                                 async def record_micro(b_id=batch.id, t_id=current_timepoint.id):
                                     # Open a simple dialog to enter micro results
-
-                                    # get measurement to preserve other values
-                                    measurement = get_batch_measurement(b_id, t_id)
-
                                     with ui.dialog() as micro_dialog, ui.card():
                                         ui.label(f'Record Microbiology for {batch.name}').classes('text-lg font-bold')
                                         micro_results = ui.textarea(
                                             'Microbiology Results',
-                                            placeholder='Enter CFU counts and any observations here...',
-                                            value=measurement.micro_results
+                                            placeholder='Enter CFU counts and any observations here...'
                                         ).classes('w-full')
                                         
                                         async def save_micro():
@@ -873,19 +865,14 @@ def create_timepoint_workflow_ui(experiment_id):
                                 
                                 # HPLC Button
                                 async def record_hplc(b_id=batch.id, t_id=current_timepoint.id):
-
-                                    # get measurement to preserve other values
-                                    measurement = get_batch_measurement(b_id, t_id)
-                                    
                                     # Open a simple dialog to enter HPLC results
                                     with ui.dialog() as hplc_dialog, ui.card():
                                         ui.label(f'Record HPLC for {batch.name}').classes('text-lg font-bold')
                                         hplc_results = ui.textarea(
                                             'HPLC Results',
-                                            placeholder='Enter HPLC results and any observations here...',
-                                            value=measurement.hplc_results
+                                            placeholder='Enter HPLC results and any observations here...'
                                         ).classes('w-full')
-
+                                        
                                         async def save_hplc():
                                             success = await record_measurement(
                                                 b_id, 

@@ -856,7 +856,7 @@ def create_experiment_edit_ui(experiment_id):
                 color='pink'
             ).classes('mr-2')
 
-            ui.button('Delete Experiment', on_click=lambda: open_experiment_delete_dialog(experiment_id, experiment.title), color='red')
+            ui.button('Back to Dashboard', on_click=lambda: ui.run_javascript("window.location.href = '/'"), color='gray').classes('mr-2')
        
 def open_batch_edit_dialog(batch_id):
     """
