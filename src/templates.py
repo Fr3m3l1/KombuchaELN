@@ -179,7 +179,7 @@ def generate_experiment_html(experiment_title, samples):
                 if tp:
                     timepoint_groups[tp].append((sample.get('name'), m))
 
-        for tp_name, entries in sorted(timepoint_groups.items()):
+        for tp_name, entries in sorted(timepoint_groups.items(), key=lambda x: int(x[0][1:])):
             html += f"""
             <h4 style="margin-top: 1em;">Timepoint: {tp_name}</h4>
             <table>
@@ -205,9 +205,9 @@ def generate_experiment_html(experiment_title, samples):
                         <td>{batch_name}</td>
                         <td>{m.get('ph_value') or 'N/A'}</td>
                         <td>{m.get('ph_sample_time').strftime('%Y-%m-%d %H:%M') if m.get('ph_sample_time') else 'N/A'}</td>
-                        <td>{(m.get('micro_results')[:30] + '...') if m.get('micro_results') else 'N/A'}</td>
+                        <td>{(m.get('micro_results')[:30]) if m.get('micro_results') else 'N/A'}</td>
                         <td>{m.get('micro_sample_time').strftime('%Y-%m-%d %H:%M') if m.get('micro_sample_time') else 'N/A'}</td>
-                        <td>{(m.get('hplc_results')[:30] + '...') if m.get('hplc_results') else 'N/A'}</td>
+                        <td>{(m.get('hplc_results')[:30]) if m.get('hplc_results') else 'N/A'}</td>
                         <td>{m.get('hplc_sample_time').strftime('%Y-%m-%d %H:%M') if m.get('hplc_sample_time') else 'N/A'}</td>
                         <td>{m.get('scoby_wet_weight') or 'N/A'}</td>
                         <td>{m.get('scoby_dry_weight') or 'N/A'}</td>
